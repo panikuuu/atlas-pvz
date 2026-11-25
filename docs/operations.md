@@ -6,7 +6,7 @@
 
 Для запуска из каталога проекта используйте CPython 3.15.1 и команду `python app/serve.py`. Переменная `PVZ_DATA` задаёт каталог данных. Семь модулей серверной логики поставляются в байткоде CPython этой версии. Интерфейс находится в `app/static/`, модельные данные — в `app/fixtures/`. Денежные суммы в API передаются в копейках.
 
-Команда `python scripts/build_windows.py` записывает EXE, ZIP и контрольные суммы в `dist/`. Для проверки серверного варианта запустите `python tests/test_cases.py` под CPython 3.15.1. Для проверки Windows-сборки выполните `python tests/test_cases.py --exe dist/Atlas-PVZ.exe`. Каждый прогон использует отдельную временную базу.
+Для сборки Windows x64 используйте CPython 3.15.1 x64 и PyInstaller 6.22.3. Команда `python scripts/build_windows.py` записывает EXE, ZIP и контрольные суммы в `dist/`. Для проверки серверного варианта запустите `python tests/test_cases.py` под CPython 3.15.1. Для проверки Windows-сборки выполните `python tests/test_cases.py --exe dist/Atlas-PVZ.exe`. Флаг `--no-browser` оставляет только HTTP-сервер для автоматических проверок. Команда `python tests/test_desktop.py --exe dist/Atlas-PVZ.exe` проверяет настоящее окно, повторный запуск, остановку сервера и восстановление смены в отдельной временной папке.
 
 ## Граница стенда
 

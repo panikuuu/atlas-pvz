@@ -1,4 +1,7 @@
 'use strict';
+if(new URLSearchParams(location.search).get('desktop')==='1'){
+  document.title='Атлас доставки · Atlas-PVZ ['+location.port+']';
+}
 const $=s=>document.querySelector(s);
 const main=$('#main'), dialog=$('#dialog');
 const moneyFormat=new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2,minimumFractionDigits:0});
@@ -98,7 +101,7 @@ function mapPage(){
   return title('Карта рейсов','Учебная агломерация · '+tm(s.now).split(',')[0]+' · Московское время',button('profile',prof(s.profile),'contract'))+
     stats([['box','Заказов в направлении',num(s.orders.filter(o=>o.source===src&&o.destination===dest).length)],['truck','Свободных попутных мест',num(s.settings.shared_slots)],['target','Индекс рейса, из 100',num(q?.index??candidate?.index)],['trend','Экономия по расчёту',signed(savings)]])+
     '<div class="map-grid"><section class="panel">'+mapHeader+mapVisual+'</section><section class="panel route-panel">'+routeInfo+'</section></div>'+
-    panel('Направления смены',table(['Направление','Заказы к окну','Попутный остаток','Решение','Экономия'],[[linkButton(q?'compare':'settings',src+'-'+dest,dir),esc(ready)+' шт.',esc(num(s.settings.shared_slots))+' мест',chip(modes[selected]||'Ожидает расчёта',q?'purple':''),signed(savings)]]),button('demo-page','Демо-сценарии','play'))+
+    panel('Направления смены',table(['Направление','Заказы к окну','Попутный остаток','Решение','Экономия'],[[linkButton(q?'compare':'settings',src+'-'+dest,dir),esc(ready)+' шт.',esc(num(s.settings.shared_slots))+' мест',chip(modes[selected]||'Ожидает расчёта',q?'accent':''),signed(savings)]]),button('demo-page','Демо-сценарии','play'))+
     panel('Результат по факту',pad(dl([['Вклад RWB',money(t.rwb_contribution)],['Эффект программы против централизованной схемы',signed(t.program_delta)],['Готовы к исходному сроку',num(t.on_time)+' из '+num(t.ready_count)]])));
 }
 window.addEventListener('hashchange',()=>{const p=location.hash.slice(1);if(p!==activePage&&allowedPages[role].includes(p))go(p)});

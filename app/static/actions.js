@@ -19,6 +19,7 @@ function compare(){
 function pointDetails(id){
   const point=s.points.find(p=>p.id===id),rd=s.quote?.readiness?.[id===s.settings.source?'source':id===s.settings.destination?'destination':'other'];
   const stock=s.lots.filter(l=>l.pvz_id===id),ready=s.orders.filter(o=>o.destination===id&&o.status==='READY_FOR_PICKUP');
+  if(!point && id!=='HUB'){dialogBox(pointName(id),dl([['Местность',stations[id].area],['Расписание','Рейсы в текущей смене отсутствуют']]));return;}
   if(!point){dialogBox('Распределительный хаб',dl([['Товар на хабе',num(s.lots.reduce((n,l)=>n+l.at_hub,0))+' ед.'],['Схема доставки','Через централизованную обработку']]));return;}
   dialogBox('ПВЗ '+pointName(id),'<div class="stack">'+dl([['Вместимость',num(point.capacity_l)+' л'],['Занято / свободно',num(point.occupied_l)+' / '+num(point.free_l)+' л'],['Доступно в рабочем окне',num(point.minutes)+' мин'],['Готовы к выдаче',num(ready.length)+' шт.'],['SKU в принятых партиях',[...new Set(stock.map(l=>l.sku_id))].join(', ')||'—'],...(rd?[['Готовность ПВЗ к партии',num(rd.index)+' из 100'],['Требуется дополнительно',num(rd.required_liters)+' л и '+num(rd.required_minutes)+' мин']]:[])])+table(['Партия','На полке','Резерв'],stock.map(l=>[linkButton('lot-detail',l.id,l.id),num(l.available),num(l.reserved)]),'На этой точке нет принятых партий.')+'</div>');
 }
@@ -48,7 +49,7 @@ function newOrder(){
   const lots=s.lots.filter(l=>l.available>0);
   if(!lots.length){dialogBox('Создание заказа',empty('Свободных единиц нет. Примите партию в разделе «Склад и смена» под ролью сотрудника ПВЗ.'));return;}
   const orig=isoField(+new Date(s.now)+(s.settings.destination==='D'?48:24)*3600000);
-  dialogBox('Тестовый заказ',form('order-form','<div class="fields">'+selectField('Партия','lot_id',lots.map(l=>[l.id,l.id+' · '+loc(l.pvz_id)+' · '+l.available+' шт.']),lots[0].id)+selectField('ПВЗ выдачи','pvz_id',Object.keys(stations).filter(k=>k!=='HUB').map(k=>[k,pointName(k)]),s.settings.destination)+field('Исходный срок, мск','promised_at','datetime-local',orig,'required')+
+  dialogBox('Тестовый заказ',form('order-form','<div class="fields">'+selectField('Партия','lot_id',lots.map(l=>[l.id,l.id+' · '+loc(l.pvz_id)+' · '+l.available+' шт.']),lots[0].id)+selectField('ПВЗ выдачи','pvz_id',s.points.map(p=>p.id).map(k=>[k,pointName(k)]),s.settings.destination)+field('Исходный срок, мск','promised_at','datetime-local',orig,'required')+
     '<label>Цена доставки покупателю<input value="0 ₽" readonly></label><label class="checkbox wide"><input type="checkbox" name="consent">Покупатель выбрал дополнительное окно</label><label class="wide" id="chosen-label" hidden>Выбранный срок, мск<input type="datetime-local" name="selected_promised_at" value="'+isoField(+new Date(orig+'+03:00')+86400000)+'" disabled></label></div><p class="notes spaced">Будет зарезервирована одна единица из выбранной партии.</p>','Зарезервировать единицу'));
 }
 function lotDetails(id){
