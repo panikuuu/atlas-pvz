@@ -8,6 +8,7 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - run: node tests/test_map.cjs
       - name: Start the Docker deployment
         run: docker compose up --build -d --wait --wait-timeout 90
       - name: Check the published service and run six isolated cases
@@ -21,10 +22,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.15.1'
+          architecture: x64
+      - run: python -m pip install PyInstaller==6.22.3
       - name: Package and launch the portable executable
         run: |
           python scripts/build_windows.py
           python tests/test_cases.py --exe dist/Atlas-PVZ.exe
+          python tests/test_desktop.py --exe dist/Atlas-PVZ.exe
       - uses: actions/upload-artifact@v4
         with:
           name: Atlas-PVZ-Windows-x64

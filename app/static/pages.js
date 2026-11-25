@@ -8,7 +8,7 @@ const service=k=>k?.startsWith('REVERSE_')?'Сторно · '+(services[k.slice(
 function place(k){
   if(!k)return 'Вне сети';const [site,st]=k.split(':');return st?loc(site)+' · '+(states[st]||st):states[k]||loc(k);
 }
-const stateBadge=k=>chip(states[k]||k,['ISSUED','READY_FOR_PICKUP','RESTOCKED'].includes(k)?'good':k==='IN_TRANSIT'?'purple':'');
+const stateBadge=k=>chip(states[k]||k,['ISSUED','READY_FOR_PICKUP','RESTOCKED'].includes(k)?'good':k==='IN_TRANSIT'?'accent':'');
 const eventsFor=o=>({RESERVED:['ASSEMBLED'],ASSIGNED:['HANDED_OVER'],IN_TRANSIT:s.incidents?.some(i=>i.order_id===o.id&&i.status==='OPEN')?['RECOVERED']:['ARRIVED','INCIDENT'],READY_FOR_PICKUP:['ISSUED'],ISSUED:['RETURNED'],INSPECTION:['RETURN_SENT','QUARANTINED'],RETURN_IN_TRANSIT:['RETURN_RECEIVED']})[o.status]||[];
 function orderRows(list){
   return table(['Заказ','Партия','Направление','Статус','Обещано, мск','Готовность'],list.map(o=>[linkButton('order-detail',o.id,o.id),esc(o.lot_id),esc(loc(o.source)+' → '+loc(o.destination)),stateBadge(o.status),esc(tm(o.promised_at)),o.ready_at?(o.late_hours?chip('Опоздание '+num(o.late_hours)+' ч','warn'):chip('В срок','good')):(+new Date(o.promised_at)<+new Date(s.now)?chip('Просрочен','warn'):chip('Открыт'))]),'Заказы появятся после резервирования принятой партии.');
@@ -57,7 +57,7 @@ function portfolioPage(){
 function demoPage(){
   const idx=s.step??0,count=s.steps.length,done=idx>=count;
   return title('Демо-сценарии','Сквозные проверки операций, остатков и начислений',button('map-page','Карта рейсов','map'))+
-    panel(scenarios[s.scenario]?.[0]||'Активная смена',pad('<div class="stack"><div class="section-actions">'+chip(prof(s.profile),'purple')+chip(s.fixture_version||'golden-v1')+chip(count?'Шаг '+idx+' из '+count:'Свободная смена')+'</div>'+(count?'<ol class="step-list">'+s.steps.map((x,i)=>'<li class="'+(i<idx?'done':i===idx?'next':'')+'">'+esc(x.label)+(i<idx?' ✓':'')+'</li>').join('')+'</ol><div class="section-actions">'+button('demo-step','Следующий шаг','arrow',true,done?'disabled':'')+button('demo-run','Пройти до конца','play',false,done?'disabled':'')+'</div>':'')+
+    panel(scenarios[s.scenario]?.[0]||'Активная смена',pad('<div class="stack"><div class="section-actions">'+chip(prof(s.profile),'accent')+chip(s.fixture_version||'golden-v1')+chip(count?'Шаг '+idx+' из '+count:'Свободная смена')+'</div>'+(count?'<ol class="step-list">'+s.steps.map((x,i)=>'<li class="'+(i<idx?'done':i===idx?'next':'')+'">'+esc(x.label)+(i<idx?' ✓':'')+'</li>').join('')+'</ol><div class="section-actions">'+button('demo-step','Следующий шаг','arrow',true,done?'disabled':'')+button('demo-run','Пройти до конца','play',false,done?'disabled':'')+'</div>':'')+
     (s.replay_check?'<div class="notice">Повторены два скана. Новых движений, начислений и инцидентов: '+[s.replay_check.movements,s.replay_check.ledger,s.replay_check.incidents].join(' / ')+'. Изменение количества: HTTP '+s.replay_check.changed_body_status+'.</div>':'')+dl([['Физический остаток в сети',num(s.totals.network_units)+' шт.'],['Фактические расходы RWB',money(s.totals.rwb_cost)],['Готовы к исходному сроку',num(s.totals.on_time)+' из '+num(s.totals.ready_count)]])+'</div>'))+
     panel('Выбрать сценарий',Object.entries(scenarios).map(([id,[n,desc]],i)=>'<div class="scenario-row '+(s.scenario===id?'active':'')+'"><span class="scenario-id">'+(i<5?'0'+(i+1):icon(i===5?'map':'box',17))+'</span><div class="grow"><h3>'+esc(n)+'</h3><p>'+esc(desc)+'</p></div>'+button('reset','Начать','',false,'data-id="'+id+'"')+'</div>').join(''));
 }

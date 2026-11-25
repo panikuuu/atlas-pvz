@@ -1,57 +1,134 @@
 'use strict';
-const stations = {
-  A:{x:142,y:210,title:'Центр',letter:'А'}, B:{x:408,y:111,title:'Университет',letter:'Б'},
-  C:{x:552,y:257,title:'Райцентр',letter:'В'}, D:{x:704,y:124,title:'Озёрное',letter:'Г'},
-  HUB:{x:325,y:293,title:'Хаб',letter:'Х'}
+const mapWidth=1040, mapHeight=510;
+const stations={
+  A:{x:150,y:215,letter:'А',title:'Центр',area:'Город'},
+  B:{x:352,y:121,letter:'Б',title:'Университет',area:'Город'},
+  C:{x:647,y:303,letter:'В',title:'Райцентр',area:'Посёлок'},
+  D:{x:871,y:165,letter:'Г',title:'Озёрное',area:'Село'},
+  HUB:{x:366,y:383,letter:'Х',title:'Хаб',area:'Промзона'},
+  E:{x:92,y:93,letter:'Д',title:'Северный',area:'Город'},
+  F:{x:89,y:378,letter:'Е',title:'Вокзальный',area:'Город'},
+  G:{x:603,y:95,letter:'Ж',title:'Боровое',area:'Деревня'},
+  J:{x:821,y:407,letter:'З',title:'Луговая',area:'Деревня'},
+  K:{x:966,y:303,letter:'И',title:'Мельницы',area:'Деревня'}
 };
+const junctions={...stations, west:{x:241,y:203}, north:{x:280,y:132},
+  south:{x:228,y:344}, bridge:{x:521,y:287}, fork:{x:734,y:245}, mill:{x:918,y:260}};
+const roads=[
+  ['E','A',[[92,148],[137,148]]],['E','north',[[172,93],[190,118]]],
+  ['A','west',[[195,215]]],['west','north',[[244,152]]],['north','B',[[315,132]]],
+  ['F','A',[[89,300],[150,291]]],['F','south',[[161,378],[180,344]]],
+  ['A','south',[[194,266],[194,321]]],['south','HUB',[[278,350],[306,383]]],
+  ['HUB','B',[[380,289],[368,230],[368,161]]],
+  ['west','bridge',[[288,207],[338,247],[401,258],[461,284]]],
+  ['HUB','bridge',[[427,383],[451,344],[498,332]]],
+  ['bridge','fork',[[552,266],[612,250],[677,252]]],
+  ['bridge','C',[[566,287],[599,307]]],['C','fork',[[679,295],[700,259]]],
+  ['fork','D',[[762,237],[797,191],[831,191]]],['D','mill',[[899,185],[907,226]]],
+  ['mill','K',[[947,272]]],['K','J',[[927,349],[864,365]]],
+  ['J','C',[[788,386],[749,388],[712,350],[665,337]]],
+  ['G','fork',[[645,116],[645,166],[700,211]]],['B','G',[[405,104],[450,119],[504,114],[547,89]]]
+];
+// Geometry for a road is shared by the road surface, route strokes and direction arrows.
+const roadGraph=new Map(Object.keys(junctions).map(id=>[id,[]]));
+for(const [from,to,bends] of roads){
+  const coords=[junctions[from],...bends.map(([x,y])=>({x,y})),junctions[to]];
+  const length=coords.slice(1).reduce((n,p,i)=>n+Math.hypot(p.x-coords[i].x,p.y-coords[i].y),0);
+  roadGraph.get(from).push({to,coords,length});
+  roadGraph.get(to).push({to:from,coords:[...coords].reverse(),length});
+}
+function roadRoute(start,end){
+  const pending=[{id:start,dist:0,edges:[]}], visited=new Set();
+  while(pending.length){
+    pending.sort((a,b)=>a.dist-b.dist);
+    const item=pending.shift();
+    if(item.id===end)return item.edges;
+    if(visited.has(item.id))continue;
+    visited.add(item.id);
+    for(const edge of roadGraph.get(item.id)){
+      if(!visited.has(edge.to))pending.push({id:edge.to,dist:item.dist+edge.length,edges:[...item.edges,edge]});
+    }
+  }
+  throw Error('Нет дороги между '+start+' и '+end);
+}
+function pathOf(points){
+  return points.map((p,i)=>(i?'L':'M')+p.x+' '+p.y).join(' ');
+}
+function routeEdges(a,b,viaHub=false){
+  return viaHub?[...roadRoute(a,'HUB'),...roadRoute('HUB',b)]:roadRoute(a,b);
+}
+function routeStroke(edges,color,width,dotted=false){
+  return '<path d="'+edges.map(e=>pathOf(e.coords)).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="'+width+'" stroke-linejoin="round" stroke-linecap="round" '+(dotted?'stroke-dasharray="2 7"':'')+'/>';
+}
+function along(edges,fraction){
+  let remaining=edges.reduce((n,e)=>n+e.length,0)*fraction;
+  for(const e of edges)for(let i=1;i<e.coords.length;i++){
+    const a=e.coords[i-1],b=e.coords[i],dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
+    if(remaining<=len)return {x:a.x+dx*remaining/len,y:a.y+dy*remaining/len,angle:Math.atan2(dy,dx)*180/Math.PI};
+    remaining-=len;
+  }
+}
+function arrow(p,color){
+  return '<g transform="translate('+p.x+' '+p.y+')"><circle r="11" fill="white" stroke="'+color+'" stroke-width="2"/><path d="M-5 0H5M1 -4l4 4-4 4" fill="none" stroke="'+color+'" stroke-width="2" transform="rotate('+p.angle+')"/></g>';
+}
+function pointMarkers(active=[],interactive=true){
+  return Object.entries(stations).map(([id,p])=>{
+    const label=(['Деревня','Село'].includes(p.area)?(p.area==='Село'?'с. ':'д. '):'')+p.title;
+    const fill=active.includes(id)?'#ad292f':id==='HUB'?'#89642f':'#455d60';
+    return '<g transform="translate('+p.x+' '+p.y+')" '+(interactive?'class="map-point" role="button" tabindex="0" data-point="'+id+'" aria-label="'+label+'"':'')+'><circle r="14" fill="'+fill+'" stroke="#fffdf6" stroke-width="3"/><text y="4" text-anchor="middle" fill="white" font-size="12" font-weight="bold">'+p.letter+'</text><text class="map-name" text-anchor="middle" y="30">'+label+'</text></g>';
+  }).join('');
+}
 let terrain;
 function mapTerrain(){
-  if(terrain) return terrain;
-  let seed=29;
-  function rand(){seed=(seed*16807)%2147483647;return seed/2147483647;}
-  let blocks='';
-  const colors=['#e5e3dc','#dcded9','#e3e4df','#dbddd7','#d8dcd9','#d6e3d2'];
-  for(let x=-150;x<940;x+=47) for(let y=-200;y<580;y+=34){
-    let w=35+rand()*6,h=22+rand()*5;
-    blocks+='<g transform="translate('+x+' '+y+')"><rect width="'+w+'" height="'+h+'" rx="2" fill="'+colors[Math.floor(rand()*colors.length)]+'"/>';
-    if(rand()<.75)blocks+='<path d="M5 4h7v13H5z M17 5h15v5H17z" fill="#cdd1ca" opacity=".45"/>';
-    blocks+='</g>';
+  if(terrain)return terrain;
+  let buildings='',trees='',hamlets='';
+  let seed=7321;
+  function random(){
+    seed=(seed*16807)%2147483647;
+    return seed/2147483647;
   }
-  const streets=['M-80 293Q95 221 190 214T404 142T594 100T865 33','M-70 58Q109 80 195 133T389 201T610 288L882 392','M110 -54Q136 120 213 235T280 435','M454 -46Q428 82 489 176T527 439','M-50 323Q113 340 264 283T563 223T851 152','M628 -31Q645 78 717 143T814 294'];
-  const river='M225 -60 C208 16 334 9 324 71 S237 148 275 181 S419 210 433 258 S415 353 470 410';
-  terrain='<rect width="800" height="355" fill="#edeee9"/><g transform="rotate(-19 400 175)">'+blocks+'</g>'+
-    '<g fill="#d1e1c9" stroke="#c3d8bf" stroke-width="2"><path d="m-12 85 49-43 32 10 29 55-26 27-55-8z"/><path d="m375 54 56-39 87 12 16 38-67 22-29-20-49 12z"/><path d="m599 132 36-46 45 11 25 45-62 26z"/><path d="m69 296 38-38 47 13 35 55-42 43H82z"/><path d="m606 331 42-33 75 15 27 55-127 7z"/></g>'+
-    '<path d="'+river+'" fill="none" stroke="#cedfd8" stroke-width="44"/><path d="'+river+'" fill="none" stroke="#acd5df" stroke-width="34"/>'+
-    streets.map(d=>'<path d="'+d+'" fill="none" stroke="#d8d7cf" stroke-width="12"/><path d="'+d+'" fill="none" stroke="#faf9f3" stroke-width="9"/>').join('')+
-    '<path d="M-20 337Q205 339 400 280T820 269" fill="none" stroke="#c1c3b9" stroke-width="2" stroke-dasharray="6 3"/><g fill="#768d81" font-family="Segoe UI, sans-serif" font-size="11" font-weight="500" letter-spacing="1.6"><text x="48" y="76" transform="rotate(-14 48 76)">СЕВЕРНЫЙ ПАРК</text><text x="612" y="326">ЗАРЕЧЬЕ</text><text x="447" y="59">СОСНОВКА</text></g>';
+  // City blocks end at the river. The opposite bank contains separated hamlets and cultivated strips.
+  for(let x=-18;x<435;x+=52)for(let y=-10;y<532;y+=47){
+    if((x>170 && x<290 && y<95)||(x>330 && y>390))continue;
+    const width=34+Math.floor(11*random()),height=27+Math.floor(10*random());
+    buildings+='<rect x="'+x+'" y="'+y+'" width="'+width+'" height="'+height+'" rx="3" fill="#deded3"/>'+
+      '<path transform="translate('+x+' '+y+')" d="M5 5h19v6H11v17H5zM28 13h10v18H28z" fill="#c5c7bf"/>';
+  }
+  for(const [x,y,nx,ny] of [[588,258,5,4],[841,137,4,2],[565,70,4,2],[782,379,4,2],[923,279,4,2]]){
+    for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){
+      const px=x+i*17+(j%2)*4,py=y+j*20+(i%2)*3;
+      hamlets+='<g transform="translate('+px+' '+py+') rotate(-12)"><rect x="-2" y="-3" width="15" height="15" fill="#d5dcb9"/><rect width="10" height="7" fill="#bc9a7c"/><path d="M0 3h10" stroke="#977c69"/></g>';
+    }
+  }
+  for(let i=0;i<95;i++){
+    const x=Math.round(638+random()*220),y=Math.round(9+random()*111);
+    if(((x-750)/109)**2+((y-62)/55)**2<1)trees+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="#b2c7a4"/>';
+  }
+  const river='M481 -22C394 85 537 166 477 228S455 342 501 405S526 487 489 540';
+  const allRoads=roads.map(([from,to])=>roadGraph.get(from).find(e=>e.to===to));
+  terrain='<defs><pattern id="fields" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(28)"><rect width="12" height="12" fill="#e7dfb9"/><path d="M2 0v12" stroke="#d8cfa6" stroke-width="2"/></pattern></defs>'+
+    '<rect width="1040" height="510" fill="#e9edda"/><path d="M437 0H0v510h470l-34-89 13-97-24-84 29-87z" fill="#ecebe3"/>'+buildings+
+    '<path d="M492 5l103 12-26 128-70-13zM584 162l75 12 24 61-99 23-34-27zM766 253l104-29 24 80-99 38-49-41zM553 382l105-25 68 99-145 43zM891 419l119-52 43 89-123 43z" fill="url(#fields)"/>'+
+    '<path d="M630 34q101-63 206-9l28 69-116 22-74-33zM169 12h110l-7 72-67 12-43-23z" fill="#cbdac0"/>'+trees+
+    '<path d="M864 16q64-20 126 32l-11 39-58 8-15-23-40-12z" fill="#a8cdd2"/>'+
+    '<path d="'+river+'" fill="none" stroke="#c8d9c0" stroke-width="38"/><path d="'+river+'" fill="none" stroke="#aed3d8" stroke-width="24"/>'+hamlets+
+    routeStroke(allRoads,'#c9c4b6',12)+routeStroke(allRoads,'#fffdf5',9)+
+    '<g class="map-district"><text x="25" y="38">ГОРОДСКОЙ ОКРУГ</text><text x="624" y="480">СЕЛЬСКИЙ РАЙОН</text></g>';
   return terrain;
 }
 let zoom=1;
-function networkMap(source,destination,mode,activeCount){
-  const city=['AB','BA'].includes(source+destination), rural=['CD','DC'].includes(source+destination);
-  const reverse=['BA','DC'].includes(source+destination);
-  const color='#7152cb',hubColor='#ac752d',neutral='#8b98a5';
-  function line(d,c,dash=''){
-    return '<path d="'+d+'" fill="none" stroke="#fff" stroke-width="8" opacity=".85"/><path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="4" stroke-linecap="round" '+(dash?'stroke-dasharray="'+dash+'"':'')+'/>';
-  }
-  const useHub=mode==='HUB', unresolved=mode==='MANUAL_EXCEPTION';
-  const points=Object.entries(stations).map(([id,p])=>{
-    const active=id===source||id===destination||id==='HUB'&&useHub;
-    const fill=id==='HUB'?'#986e38':active?'#5d449f':'#53656f';
-    let w=p.title.length*7.8+17;
-    return '<g class="map-point" data-point="'+id+'" role="button" tabindex="0" aria-label="'+p.title+'" transform="translate('+p.x+' '+p.y+')">'+
-      '<circle r="22" fill="'+fill+'" opacity="'+(active?'.11':'.05')+'"/><circle r="13" fill="'+fill+'" stroke="white" stroke-width="3"/>'+
-      '<text text-anchor="middle" y="4" fill="white" font-size="12" font-weight="700">'+p.letter+'</text><rect x="'+(-w/2)+'" y="19" width="'+w+'" height="21" rx="5" fill="white" stroke="#dbdeda"/><text text-anchor="middle" y="33.5" font-size="11.5" fill="#304042" font-weight="600">'+p.title+'</text></g>';
-  }).join('');
-  let paths=line('M142 210Q210 149 264 154T408 111',city&&!useHub&&!unresolved?color:neutral,city&&!useHub&&!unresolved?'':'5 6')+
-    line('M552 257Q600 200 630 197T704 124',rural&&!useHub&&!unresolved?color:neutral,rural&&!useHub&&!unresolved?'':'5 6');
-  if(city) paths+=line('M142 210Q226 273 325 293Q400 218 408 111',useHub?hubColor:'#ae9b7e','4 7');
-  else if(rural) paths+=line('M552 257Q408 255 325 293Q434 145 704 124',useHub?hubColor:'#ae9b7e','4 7');
-  else paths+=line('M142 210Q340 203 552 257',useHub?neutral:color)+line('M142 210Q200 257 325 293L552 257',useHub?hubColor:'#ae9b7e','4 7');
-  const m=city?{x:275,y:150,ang:-12}:rural?{x:630,y:196,ang:-26}:{x:345,y:220,ang:8};
-  if(reverse)m.ang+=180;
-  const routeArrow='<g class="map-point" data-action="compare" role="button" tabindex="0" aria-label="Сравнить маршруты" transform="translate('+m.x+' '+m.y+')"><circle r="14" fill="white" stroke="'+(useHub?neutral:color)+'" stroke-width="2"/><path transform="rotate('+m.ang+')" d="M-6 0h12 M1-5l5 5-5 5" fill="none" stroke="'+(useHub?neutral:color)+'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4"/></g>';
-  const vx=800/zoom,vy=355/zoom;
-  const cx=zoom===1?400:Math.max(vx/2,Math.min(800-vx/2,m.x)),cy=zoom===1?177.5:Math.max(vy/2,Math.min(355-vy/2,m.y));
-  return '<svg id="city-map" xmlns="http://www.w3.org/2000/svg" viewBox="'+[cx-vx/2,cy-vy/2,vx,vy].join(' ')+'" preserveAspectRatio="xMidYMid meet" role="group" aria-label="Схема учебной агломерации">'+mapTerrain()+paths+routeArrow+points+'</svg>';
+function networkMap(source,destination,mode){
+  const direct=routeEdges(source,destination),hub=routeEdges(source,destination,true);
+  const via=mode==='HUB',active=Boolean(mode)&&mode!=='MANUAL_EXCEPTION';
+  const chosen=via?hub:direct;
+  const midpoint=along(chosen,.50),w=mapWidth/zoom,h=mapHeight/zoom;
+  const x=Math.max(0,Math.min(mapWidth-w,midpoint.x-w/2)),y=Math.max(0,Math.min(mapHeight-h,midpoint.y-h/2));
+  const color=via?'#946624':active?'#b72d32':'#84918c';
+  const inactive=[['A','B'],['C','D']].filter(([a,b])=>!(a===source && b===destination || b===source && a===destination))
+    .map(([a,b])=>routeStroke(roadRoute(a,b),'#8b9898',2,true)).join('');
+  const layers=via?routeStroke(direct,'#84918c',3,true)+routeStroke(hub,color,4,true):
+    routeStroke(hub,'#a78d66',3,true)+routeStroke(direct,color,4,!active);
+  return '<svg id="city-map" viewBox="'+[x,y,w,h].join(' ')+'" aria-label="Дороги и пункты учебной агломерации" role="group">'+mapTerrain()+inactive+layers+
+    '<g class="map-point" role="button" tabindex="0" data-action="compare" aria-label="Сравнить маршруты">'+arrow(midpoint,color)+'</g>'+
+    pointMarkers(via?[source,destination,'HUB']:[source,destination])+'</svg>';
 }
