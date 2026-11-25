@@ -1,0 +1,2104 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ПВЗ · локальная доставка",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/state": {
+      "get": {
+        "operationId": "get_state",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/State"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/map": {
+      "get": {
+        "operationId": "get_map",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "city",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "demand",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "district",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "consent",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Map"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stock": {
+      "get": {
+        "operationId": "get_stock",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "seller_id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pvz_id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "lot_id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Lot"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "operationId": "get_orders__id_",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ledger": {
+      "get": {
+        "operationId": "get_ledger",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "seller_id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pvz_id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "lot_id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LedgerEntry"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio": {
+      "get": {
+        "operationId": "get_portfolio",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "consent",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "demand",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Portfolio"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/receipts": {
+      "post": {
+        "operationId": "post_receipts",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Receipt"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders": {
+      "post": {
+        "operationId": "post_orders",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/routing/quotes": {
+      "post": {
+        "operationId": "post_routing_quotes",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/routing/quotes/{id}": {
+      "get": {
+        "operationId": "get_routing_quotes__id_",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dispatches": {
+      "post": {
+        "operationId": "post_dispatches",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "post": {
+        "operationId": "post_events",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/reset": {
+      "post": {
+        "operationId": "post_demo_reset",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/step": {
+      "post": {
+        "operationId": "post_demo_step",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StepResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/run": {
+      "post": {
+        "operationId": "post_demo_run",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StepResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clock": {
+      "post": {
+        "operationId": "post_clock",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClockInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClockResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "post": {
+        "operationId": "post_settings",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profile": {
+      "post": {
+        "operationId": "post_profile",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/direction": {
+      "post": {
+        "operationId": "post_direction",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dispatcher",
+                "pvz",
+                "seller"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Direction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка запроса",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "error",
+          "message",
+          "request_id"
+        ],
+        "additionalProperties": true
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sku_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pvz_id": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "seller_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dimensions_mm": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "mass_g": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "barcode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "storage_days": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sale_price": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cost_price": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "lot_id",
+          "sku_id",
+          "pvz_id",
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "OrderInput": {
+        "type": "object",
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "order_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pvz_id": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "quantity": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "promised_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "original_promised_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "selected_promised_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "consent": {
+            "type": "boolean"
+          },
+          "delivery_price": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "lot_id",
+          "pvz_id",
+          "quantity",
+          "promised_at"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteInput": {
+        "type": "object",
+        "properties": {
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "window_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scenario_version": {
+            "type": "string",
+            "enum": [
+              "golden-v1"
+            ]
+          }
+        },
+        "required": [
+          "order_ids",
+          "window_id",
+          "scenario_version"
+        ],
+        "additionalProperties": false
+      },
+      "DispatchInput": {
+        "type": "object",
+        "properties": {
+          "quote_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selected": {
+            "type": "string",
+            "enum": [
+              "SHARED_TRIP",
+              "DEDICATED_TRIP",
+              "COMBINED",
+              "HUB",
+              "MANUAL_EXCEPTION"
+            ]
+          }
+        },
+        "required": [
+          "quote_id",
+          "expected_version",
+          "selected"
+        ],
+        "additionalProperties": false
+      },
+      "EventInput": {
+        "type": "object",
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "ASSEMBLED",
+              "HANDED_OVER",
+              "ARRIVED",
+              "ISSUED",
+              "RETURNED",
+              "RETURN_SENT",
+              "RETURN_RECEIVED",
+              "QUARANTINED",
+              "INCIDENT",
+              "RECOVERED",
+              "WITHDRAW_REQUESTED",
+              "WITHDRAW_SENT",
+              "WITHDRAW_RECEIVED"
+            ]
+          },
+          "order_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lot_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dispatch_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pvz_id": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "next_attempt_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rescue_dispatch_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "event_type",
+          "expected_version",
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "ClockInput": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "now"
+        ],
+        "additionalProperties": false
+      },
+      "ProfileInput": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "pilot",
+              "original"
+            ]
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "additionalProperties": false
+      },
+      "SettingsInput": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "settings"
+        ],
+        "additionalProperties": false
+      },
+      "ResetInput": {
+        "type": "object",
+        "properties": {
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "case1",
+              "case2",
+              "case3",
+              "case4",
+              "case5",
+              "rural",
+              "sandbox"
+            ]
+          }
+        },
+        "required": [
+          "scenario"
+        ],
+        "additionalProperties": false
+      },
+      "Empty": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "LedgerEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from_party": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to_party": {
+            "type": "string",
+            "minLength": 1
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "service": {
+            "type": "string",
+            "minLength": 1
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "service"
+        ],
+        "additionalProperties": true
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lot_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1
+          },
+          "promised_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "status"
+        ],
+        "additionalProperties": true
+      },
+      "Lot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "available": {
+            "type": "integer"
+          },
+          "pvz_id": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "quantity",
+          "available"
+        ],
+        "additionalProperties": true
+      },
+      "Candidate": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "savings": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "index": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "mode",
+          "eligible"
+        ],
+        "additionalProperties": true
+      },
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "quote_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selected": {
+            "type": "string",
+            "enum": [
+              "SHARED_TRIP",
+              "DEDICATED_TRIP",
+              "COMBINED",
+              "HUB",
+              "MANUAL_EXCEPTION"
+            ]
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            }
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "profile": {
+            "type": "string",
+            "enum": [
+              "pilot",
+              "original"
+            ]
+          },
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "quote_id",
+          "selected",
+          "candidates",
+          "plans",
+          "version",
+          "profile"
+        ],
+        "additionalProperties": true
+      },
+      "State": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile": {
+            "type": "string",
+            "enum": [
+              "pilot",
+              "original"
+            ]
+          },
+          "step": {
+            "type": "integer"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Order"
+            }
+          },
+          "lots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Lot"
+            }
+          },
+          "ledger": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntry"
+            }
+          },
+          "metrics": {
+            "type": "object"
+          },
+          "settings": {
+            "type": "object"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "incidents": {
+            "type": "array"
+          },
+          "movements": {
+            "type": "array"
+          },
+          "dispatches": {
+            "type": "array"
+          },
+          "totals": {
+            "type": "object"
+          },
+          "portfolio": {
+            "type": "object"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Quote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "now",
+          "scenario",
+          "profile",
+          "step",
+          "orders",
+          "lots",
+          "ledger",
+          "version",
+          "quote"
+        ],
+        "additionalProperties": true
+      },
+      "Portfolio": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "integer"
+          },
+          "direct": {
+            "type": "integer"
+          },
+          "hub": {
+            "type": "integer"
+          },
+          "operating_savings": {
+            "type": "integer"
+          },
+          "tariff_delta": {
+            "type": "integer"
+          },
+          "coordination": {
+            "type": "integer"
+          },
+          "rwb_delta": {
+            "type": "integer"
+          },
+          "startup": {
+            "type": "integer"
+          },
+          "after_startup": {
+            "type": "integer"
+          },
+          "shifted": {
+            "type": "integer"
+          },
+          "extra_effect": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "orders",
+          "direct",
+          "hub",
+          "rwb_delta"
+        ],
+        "additionalProperties": true
+      },
+      "Map": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array"
+          },
+          "edges": {
+            "type": "array"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "points",
+          "edges",
+          "version"
+        ],
+        "additionalProperties": true
+      },
+      "Direction": {
+        "type": "object",
+        "required": [
+          "source",
+          "destination"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          }
+        }
+      },
+      "ReceiptResult": {
+        "type": "object",
+        "properties": {
+          "receipt_id": {
+            "type": "string"
+          },
+          "lot_id": {
+            "type": "string"
+          },
+          "pvz_id": {
+            "type": "string"
+          },
+          "available": {
+            "type": "integer"
+          },
+          "available_l": {
+            "type": "number"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "lot_id",
+          "pvz_id",
+          "available",
+          "available_l",
+          "version"
+        ]
+      },
+      "OrderResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "unit_id": {
+            "type": "string"
+          },
+          "lot_id": {
+            "type": "string"
+          },
+          "promised_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "version",
+          "unit_id",
+          "lot_id",
+          "promised_at"
+        ]
+      },
+      "EventResult": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "movements": {
+            "type": "array"
+          },
+          "ledger_entry_ids": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "event_id",
+          "status",
+          "version",
+          "movements",
+          "ledger_entry_ids"
+        ]
+      },
+      "DispatchResult": {
+        "type": "object",
+        "properties": {
+          "manifests": {
+            "type": "array"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "remaining": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "manifests",
+          "version",
+          "remaining"
+        ]
+      },
+      "StepResult": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "integer"
+          },
+          "finished": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "step",
+          "finished"
+        ]
+      },
+      "ClockResult": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string"
+          },
+          "charged_unit_days": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "now",
+          "charged_unit_days"
+        ]
+      },
+      "SettingsResult": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer"
+          },
+          "quote": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "quote"
+        ]
+      },
+      "ResetResult": {
+        "type": "object",
+        "properties": {
+          "scenario": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scenario",
+          "step"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172743">
+  <title>Атлас доставки · RWB</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/icons.js"></script>
+  <script defer src="/map.js"></script>
+  <script defer src="/app.js"></script><script defer src="/pages.js"></script><script defer src="/planning.js"></script><script defer src="/actions.js"></script>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <a class="skip" href="#main">К рабочей области</a>
+  <aside class="sidebar">
+    <div class="brand"><span class="brandmark" aria-hidden="true"><i></i><i></i><i></i></span><span>Атлас доставки<small>RWB Логистика</small></span></div>
+    <nav id="nav" aria-label="Разделы"></nav>
+    <div class="side-foot"><span class="status-dot" id="connection-dot"></span><span id="connection">Подключение…</span></div>
+  </aside>
+  <div class="workspace">
+    <header class="bar">
+      <span id="crumb">Рабочее место</span>
+      <div class="bar-right"><button id="clock-control" class="plain" data-action="clock" aria-label="Виртуальные часы"></button><span class="vertical"></span><label class="role-control"><span class="avatar" aria-hidden="true"></span><select id="role" aria-label="Рабочая роль"><option value="dispatcher">Диспетчер</option><option value="pvz">Сотрудник ПВЗ</option><option value="seller">Продавец</option></select></label></div>
+    </header>
+    <main id="main" tabindex="-1" aria-busy="true"><p class="empty">Загружаем рабочую смену…</p></main>
+  </div>
+  <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-body"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
