@@ -1,0 +1,5 @@
+**
+!app/
+!app/**
+app/data/
+app/**/__pycache__/

@@ -1,0 +1,9 @@
+/dist/
+/build/
+/data/
+/app/data/
+__pycache__/
+*.sqlite*
+*.db
+.env
+.DS_Store
