@@ -6,3 +6,47 @@
 @media(max-width:760px){:root{--nav:0px}.sidebar{position:static;width:100%;height:auto;border-right:0;border-bottom:1px solid var(--line);flex-direction:row;align-items:center}.brand{height:48px;padding:0 10px}.brandmark{width:28px;height:30px}.sidebar nav{display:flex;gap:3px;overflow:auto;padding:4px}.nav-item{width:auto;padding:9px}.nav-sep,.side-foot{display:none}.bar{height:46px;padding:0 12px}.bar-right{gap:5px}.bar #crumb{font-size:11px}.avatar{width:23px;height:23px}.role-control select{font-size:12px}.clock-long{display:none}.bar .vertical{display:none}main{padding:18px 12px 35px}.head{gap:7px;margin-bottom:15px}.head .btn{font-size:12px;padding:7px 9px}.head .section-actions{justify-content:flex-end}.stats{grid-template-columns:1fr 1fr;gap:13px 0;padding:13px 0;margin-bottom:14px}.stat:nth-child(2){border:0}.map-grid,.two-col{grid-template-columns:1fr;gap:12px}.map-wrap{min-height:0}.panel-head{flex-wrap:wrap}.route-panel .route-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.route-option{display:block}.route-option .amount{text-align:left;margin-top:5px}.route-title{font-size:19px}.scenario-row{gap:8px;padding:12px}.scenario-id{min-width:28px}.fields{gap:10px}td,th{padding:8px 11px}dialog .panel-body{padding:12px}.bar-right .plain{font-size:11px}.section-actions{gap:5px}.sub{font-size:12px}}
 @media(max-width:430px){.bar #crumb b{display:none}.head{align-items:flex-start}.head .section-actions{max-width:135px}.route-list{padding:0 8px}.route-option{padding:7px}.fields{grid-template-columns:1fr}.fields .wide{grid-column:auto}.panel-head h2{font-size:17px}.brand{padding:0 6px}.sidebar nav{gap:0}.nav-item{padding:8px}.map-tools{bottom:5px;right:5px}.map-tools button{width:23px;height:23px}}
 [hidden]{display:none!important}
+
+/* Keep navigation legible beside the map and on narrow operator terminals. */
+:root {
+  --ink: #211d30;
+  --muted: #5e596d;
+  --line: #dfdce6;
+  --bg: #f6f5f8;
+  --violet: #654391;
+  --pale: #f0eaf7;
+}
+.sidebar {
+  background: #272237;
+  border-color: #272237;
+  color: #f9f7fc;
+}
+.brand small, .side-foot { color: #d4cdde; }
+.brandmark { background: #8057b0; }
+.sidebar .nav-item { color: #e3deec; }
+.sidebar .nav-item:hover { background: #3b344c; }
+.sidebar .nav-item.current {
+  background: #ede6f4;
+  color: #3d2956;
+  box-shadow: inset 3px 0 #bf94e3;
+}
+.sidebar .nav-sep, .sidebar .side-foot { border-color: #484054; }
+.sidebar .nav-sep { background: #484054; }
+.sidebar .status-dot.live {
+  background: #81e2bc;
+  box-shadow: 0 0 0 3px #334c45;
+}
+.route-option.chosen {
+  border-color: #b59bcf;
+  background: #f6f1fa;
+  box-shadow: inset 3px 0 #8661a9;
+}
+.route-option .amount, .stat strong, td.num { font-variant-numeric: tabular-nums; }
+.tariff-note { margin: 12px 16px 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.sidebar button:focus-visible { outline-color: #cba9ee; outline-offset: -2px; }
+@media (max-width: 760px) {
+  .sidebar nav { min-width: 0; }
+  .nav-item { flex-shrink: 0; min-height: 38px; }
+  .sidebar .nav-item.current span { display: inline; white-space: nowrap; }
+  .sidebar .nav-item.current { box-shadow: inset 0 -2px #bf94e3; }
+}
