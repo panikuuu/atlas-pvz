@@ -13,8 +13,7 @@ jobs:
       - name: Check the published service and run six isolated cases
         run: |
           curl --fail http://127.0.0.1:8080/health/ready
-          docker compose cp tests/test_cases.py atlas:/tmp/test_cases.py
-          docker compose exec -T atlas python /tmp/test_cases.py --app /srv/atlas
+          docker compose exec -T atlas python - --app /srv/atlas < tests/test_cases.py
       - if: always()
         run: docker compose logs && docker compose down
   windows:

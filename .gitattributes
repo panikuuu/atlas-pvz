@@ -6,3 +6,4 @@
 *.exe binary
 *.pdf binary
 *.png binary
+vendor/windows/** -text

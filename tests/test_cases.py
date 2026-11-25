@@ -100,6 +100,15 @@ def verify(base):
             assert state["alerts"][0]["reason"] == "STORAGE_LIMIT"
             assert state["lots"][0]["at_hub"] == 1 and state["lots"][0]["occupied_l"] == 0
         print(f"PASS {case}: {route}, {statuses}", flush=True)
+    request(base, "/api/profile", {"profile": "pilot"})
+    for demand, orders, direct, rubles in [
+        ("low", 568, 260, -14154), ("neutral", 792, 500, 1531), ("high", 1016, 672, 14494)
+    ]:
+        portfolio = request(base, f"/api/portfolio?demand={demand}&consent=0")
+        assert portfolio["profile"] == "pilot" and portfolio["scenario"] == demand, portfolio
+        assert (portfolio["orders"], portfolio["direct"]) == (orders, direct), portfolio
+        assert round(portfolio["rwb_delta"] / 100) == rubles, portfolio
+        print(f"PASS portfolio/{demand}: {orders} orders, {direct} direct, {rubles} RUB", flush=True)
 
 
 if __name__ == "__main__":

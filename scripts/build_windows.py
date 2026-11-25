@@ -49,7 +49,7 @@ def assemble(original):
         if name == "PYZ.pyz":
             verify_modules(zlib.decompress(payload) if flag else payload)
         if name in resources:
-            raw = resources.pop(name).read_bytes()
+            raw = resources.pop(name).read_bytes().replace(b"\r\n", b"\n")
             unpacked = len(raw)
             payload = zlib.compress(raw, 9) if flag else raw
         toc.extend(RECORD.pack(length, len(data), len(payload), unpacked, flag, kind) + name_field)
@@ -71,7 +71,10 @@ def main():
     files.update({"licenses/" + p.name: p for p in (ORIGINAL / "licenses").glob("*.txt")})
     with ZipFile(archive, "w") as target:
         for name, file in sorted(files.items()):
-            target.writestr(ZipInfo(name, date_time=(2026, 11, 25, 0, 0, 0)), file.read_bytes(),
+            info = ZipInfo(name, date_time=(2026, 11, 25, 0, 0, 0))
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            target.writestr(info, file.read_bytes(),
                             compress_type=ZIP_DEFLATED, compresslevel=9)
     checksums = [f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}" for p in (exe, archive)]
     (out / "SHA256SUMS.txt").write_text("\n".join(checksums) + "\n", encoding="ascii")
