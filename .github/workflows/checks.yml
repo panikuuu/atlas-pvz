@@ -1,0 +1,34 @@
+name: Atlas checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the Docker deployment
+        run: docker compose up --build -d --wait --wait-timeout 90
+      - name: Check the published service and run six isolated cases
+        run: |
+          curl --fail http://127.0.0.1:8080/health/ready
+          docker compose cp tests/test_cases.py atlas:/tmp/test_cases.py
+          docker compose exec -T atlas python /tmp/test_cases.py --app /srv/atlas
+      - if: always()
+        run: docker compose logs && docker compose down
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package and launch the portable executable
+        run: |
+          python scripts/build_windows.py
+          python tests/test_cases.py --exe dist/Atlas-PVZ.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Atlas-PVZ-Windows-x64
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
