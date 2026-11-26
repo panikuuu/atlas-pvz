@@ -50,7 +50,10 @@ async function api(path,body){
   if(!r.ok){const d=data.detail||data.message||data.error;const detail=typeof d==='object'?(d.message||d.detail||JSON.stringify(d)):d;throw new Error((r.status===409?'Конфликт версии или остатка. ':'')+(reasons[detail]||detail||r.statusText)+' ('+r.status+')');}
   return data;
 }
-function go(page){if(!allowedPages[role].includes(page))page=allowedPages[role][0];activePage=page;location.hash=page;render();if(page==='portfolio')loadPortfolio().catch(showError);if(page==='demand')loadDemand().catch(showError);if(page==='stock'&&stockTab==='placement'&&role==='dispatcher')loadStockPlacement().catch(showError);if(page==='fleet'||(page==='demo'&&!fleetSettings))loadFleet().catch(showError)}
+function needsFleet(page){
+  return page==='fleet'||(role==='dispatcher'&&['map','demo','portfolio','ledger'].includes(page));
+}
+function go(page){if(!allowedPages[role].includes(page))page=allowedPages[role][0];activePage=page;location.hash=page;render();if(page==='portfolio')loadPortfolio().catch(showError);if(page==='demand')loadDemand().catch(showError);if(page==='stock'&&stockTab==='placement'&&role==='dispatcher')loadStockPlacement().catch(showError);if(needsFleet(page))loadFleet().catch(showError)}
 function showError(err){
   const msg=err.message||String(err);if(dialog.open){
     $('#dialog-body .notice.error')?.remove();
@@ -72,7 +75,7 @@ async function refresh(){
     $('#connection').textContent='Стенд на связи';$('#connection-dot').classList.add('live');
     render();if(activePage==='portfolio')await loadPortfolio();if(activePage==='demand')await loadDemand().catch(showError);
     if(activePage==='stock'&&stockTab==='placement'&&role==='dispatcher')await loadStockPlacement().catch(showError);
-    if(activePage==='fleet'||(activePage==='demo'&&!fleetSettings))await loadFleet();
+    if(needsFleet(activePage))await loadFleet();
   }catch(e){if(seq!==loadSequence)return;
     $('#connection').textContent='Нет связи со стендом';$('#connection-dot').classList.remove('live');main.innerHTML=panel('Смена временно недоступна',pad('<div class="stack"><p>'+esc(e.message)+'</p>'+button('refresh','Повторить подключение','refresh')+'</div>'));main.setAttribute('aria-busy','false');}
 }
@@ -89,7 +92,12 @@ async function loadDemand(){
   }
 }
 async function change(path,data,message){
-  await api(path,data);if(dialog.open)dialog.close();portfolio=null;await refresh();if(message)toast(message);
+  await api(path,data);
+  if(path==='demo/reset'){
+    ledgerParty='';ledgerLot='';ledgerDay='';ledgerPageNo=0;
+    unifiedRun=null;
+  }
+  if(dialog.open)dialog.close();portfolio=null;await refresh();if(message)toast(message);
 }
 function render(){
   $('#role').value=role;$('.avatar').innerHTML=icon('person',15);
@@ -102,6 +110,11 @@ function render(){
 }
 function routeState(){return {src:s.settings.source||'A',dest:s.settings.destination||'B',q:s.quote||null}}
 function mapPage(){
+  if(unifiedRun&&fleetDay){
+    return title('Карта рейсов',unifiedRun.title,
+      button('fleet-page','Парк машин','truck',true)+button('demo-page','Сценарии','play'))+
+      fleetTrips(fleetDay);
+  }
   const {src,dest,q}=routeState(),{totals:t}=s,selected=q?.selected,candidates=q?.candidates||[];
   const plan=currentTruckPlan();
   const run=showTruck?activeTruck:null;

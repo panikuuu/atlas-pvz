@@ -75,7 +75,10 @@
       "get": {
         "operationId": "get_fleet_day",
         "summary": "Подтверждённый план парка, сценарии и ставки",
-        "responses": {"200":{"description":"Объект со свойствами day и settings. day равен null до первого подтверждения"},"403":{"description":"Недостаточно прав"}}
+        "responses": {"200":{"description":"План day, ставки settings и состояние рабочего дня unified у диспетчера.",
+          "content":{"application/json":{"schema":{"type":"object","properties":{"day":{"type":["object","null"]},
+            "settings":{"type":"object"},"unified":{"oneOf":[{"$ref":"#/components/schemas/UnifiedDemo"},{"type":"null"}]}}}}}},
+          "403":{"description":"Недостаточно прав"}}
       },
       "post": {
         "operationId": "apply_fleet_command",
@@ -83,7 +86,8 @@
         "parameters": [{"name":"Idempotency-Key","in":"header","schema":{"type":"string","minLength":1,"maxLength":128},"description":"Обязателен для подтверждения и выполнения"}],
         "requestBody": {"required":true,"content":{"application/json":{"schema":{
           "type":"object","required":["action"],"properties":{
-            "action":{"enum":["plan","confirm","start","scan","next"]},
+            "action":{"enum":["plan","confirm","start","scan","next","unified-start","unified-next"],
+              "description":"unified-start и unified-next доступны диспетчеру в деморежиме. Перед запуском откройте пустую свободную смену."},
             "scenario":{"enum":["assortment","bulky","deadlines","network","weekday","peak","quiet","live"]},
             "contract":{"enum":["original","pilot"],"description":"Договор для прогноза и рекомендаций"},
             "targets":{"type":"object","description":"Минимальный положительный вклад, в копейках","additionalProperties":false,
@@ -96,9 +100,10 @@
                 "liters":{"type":"number"},"kg":{"type":"number"},"planned":{"type":"boolean"}}}},
             "fingerprint":{"type":"string"},"day_id":{"type":"string"},"version":{"type":"integer"},"truck":{"type":"string"},
             "batch":{"type":"string"},"operation":{"enum":["pickup","drop","relay_drop","relay_pickup"]}
-          }
+          },
+          "allOf":[{"if":{"properties":{"action":{"const":"unified-next"}}},"then":{"required":["version"]}}]
         }}}},
-        "responses":{"200":{"description":"plan после расчёта или day после изменения"},"403":{"description":"Недостаточно прав"},
+        "responses":{"200":{"description":"plan после расчёта, day после изменения, unified и day после этапа рабочего дня"},"403":{"description":"Недостаточно прав"},
           "409":{"description":"Изменился план или партия ещё не доступна"},"422":{"description":"Проверьте параметры"}}
       }
     },
@@ -1314,6 +1319,32 @@
   },
   "components": {
     "schemas": {
+      "UnifiedDemo": {
+        "type":"object",
+        "required":["id","title","version","stage","steps","finished","next_label","summary"],
+        "properties":{
+          "id":{"type":"string"},
+          "title":{"type":"string"},
+          "version":{"type":"integer","minimum":1},
+          "stage":{"type":"integer","minimum":0,"description":"Число выполненных этапов"},
+          "fleet_id":{"type":"string"},
+          "steps":{"type":"array","items":{"type":"object","required":["label"],"properties":{"label":{"type":"string"}}}},
+          "finished":{"type":"boolean"},
+          "next_label":{"type":["string","null"]},
+          "summary":{"type":"object","properties":{
+            "orders":{"type":"integer"},"assembled":{"type":"integer"},"ready":{"type":"integer"},
+            "issued":{"type":"integer"},"returned":{"type":"integer"},"incidents":{"type":"integer"},
+            "hub_orders":{"type":"integer"},"ledger_entries":{"type":"integer"},
+            "plan":{"type":["object","null"],"description":"Сравнение для заказов, требующих перевозки, в копейках.",
+              "properties":{"all_hub":{"type":"integer"},"total":{"type":"integer"},"savings":{"type":"integer"},
+                "orders":{"type":"integer"},"fleet_orders":{"type":"integer"},"hub_orders":{"type":"integer"},
+                "relayed_orders":{"type":"integer"}}},
+            "actual":{"type":"object","description":"Денежные операции всей смены, в копейках.",
+              "properties":{"rwb_cost":{"type":"integer"},"rwb_contribution":{"type":"integer"},"seller_profit":{"type":"integer"},
+                "pvz_profit":{"type":"integer"}}}
+          }}
+        }
+      },
       "DemandReport": {
         "type": "object",
         "required": ["observed_from", "observed_to", "recalculated_at", "forecast_days", "source", "demo_enabled", "rows"],

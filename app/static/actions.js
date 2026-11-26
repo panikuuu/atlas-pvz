@@ -234,6 +234,10 @@ async function act(a,el){
     quote:async()=>{await requestQuote(batchOrders());await refresh();compare()},
     dispatch:async()=>{const q=s.quote;if(!q)return;await change('dispatches',{quote_id:q.quote_id,expected_version:q.version,selected:q.selected},'Партия закреплена за манифестом.')},
     clock:()=>dialogBox('Виртуальные часы',role==='dispatcher'?form('clock-form','<div class="stack">'+field('Дата и время, мск','now','datetime-local',isoField(s.now),'required min="'+isoField(s.now)+'"')+'<p class="notes">Перевод часов вперёд начисляет хранение за полные сутки.</p></div>','Перевести часы'):dl([['Текущее время смены',tm(s.now)+' мск']])),
+    'unified-start':()=>dialogBox('Рабочий день сети',form('unified-start-form',
+      '<p class="notes">Будет открыта отдельная учебная смена. Активная демосмена будет заменена.</p>','Запустить рабочий день')),
+    'unified-next':()=>change('fleet',{action:'unified-next',version:unifiedRun.version},'Операция рабочего дня выполнена.'),
+    'unified-open':()=>go(id),
     'demo-step':()=>change('demo/step',{},'Шаг выполнен.'),'demo-run':()=>change('demo/run',{},'Сценарий пройден.')
   };
   if(handlers[a])await handlers[a]();
@@ -304,6 +308,12 @@ document.addEventListener('submit',e=>{
       case 'truck-next-form':await truckCommand(d.action,{acknowledge:true});break;
       case 'truck-cancel-form':await truckCommand('cancel');break;
       case 'order-search':orderSearch=d.search.trim();render();break;
+      case 'unified-start-form':
+        truckPlan=null;showTruck=false;focusedTruckStop=null;fleetDraft=null;fleetDay=null;fleetSelected=null;
+        fleetFormState=null;fleetPoint='';moveMap(0,0,1);
+        await change('demo/reset',{scenario:'sandbox'});
+        await change('fleet',{action:'unified-start'},'Рабочий день открыт.');
+        break;
       case 'reset-form':truckPlan=null;showTruck=false;focusedTruckStop=null;fleetDraft=null;fleetDay=null;fleetSelected=null;moveMap(0,0,1);await change('demo/reset',{scenario:d.scenario},'Открыта чистая смена.');break;
       case 'clock-form':await change('clock',{now:d.now+':00+03:00'},'Часы переведены.');break;
       case 'profile-form':await change('profile',{profile:d.profile},'Активный договор обновлён.');break;

@@ -18,6 +18,7 @@ import operations as ops
 import pickup_points
 import server
 import stock_placement
+import unified_demo
 from commands import once, signature
 from common import Problem
 from truck_runs import TruckHandler, current, initialize as init_truck, order_state, problem
@@ -401,15 +402,24 @@ class FleetHandler(TruckHandler):
                     action=body.get("action")
                     if not post:
                         result={"day":day,"settings":fleet.FIXTURE}
+                        if role == "dispatcher":
+                            result["unified"] = unified_demo.view(db, day)
                     elif action=="plan":
                         result={"plan":calculate(db,body)}
                     else:
                         key=self.headers.get("Idempotency-Key","").strip()
                         if not 1<=len(key)<=128:
                             problem("Укажите ключ операции.",422)
-                        engine=confirm_day if action=="confirm" else lambda a,b,c:advance(a,c,b)
-                        day=once(db,"replays",key,signature(role,"/api/fleet",body),lambda:engine(db,body,day))
-                        result={"day":day}
+                        fingerprint = signature(role,"/api/fleet",body)
+                        if action in {"unified-start", "unified-next"}:
+                            if not server.DEMO_MODE:
+                                problem("Рабочий день доступен только в демонстрационном режиме.",403)
+                            result = once(db,"replays",key,fingerprint,lambda:unified_demo.command(
+                                db, body, day, calculate, confirm_day, advance))
+                        else:
+                            engine=confirm_day if action=="confirm" else lambda a,b,c:advance(a,c,b)
+                            day=once(db,"replays",key,fingerprint,lambda:engine(db,body,day))
+                            result={"day":day}
                     if role=="dispatcher" and not post and day and day["scenario"]=="live":
                         result["day"]={**day,"live_results":live_results(db,day)}
                     db.commit()

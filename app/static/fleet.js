@@ -1,7 +1,7 @@
 'use strict';
 
 let fleetDay=null,fleetDraft=null,fleetSettings=null,fleetSelected=null,fleetFocus=null;
-let fleetFormState=null,fleetPoint='';
+let fleetFormState=null,fleetPoint='',unifiedRun=null;
 const fleetNames={pickup:'Погрузить',drop:'Выгрузить к выдаче',relay_drop:'Передать в буфер',relay_pickup:'Забрать из буфера'};
 const fleetPriceNames={diesel:'Дизель, ₽/л',consumption:'Расход топлива, л/100 км',wear:'Обслуживание, ₽/км',
   driver_hour:'Работа водителя, ₽/ч',pvz_hour:'Компенсация работы ПВЗ, ₽/ч',
@@ -27,7 +27,8 @@ async function loadFleet(){
   if(role!==currentRole)return;
   fleetDay=result.day;
   fleetSettings=result.settings;
-  if(['fleet','demo'].includes(activePage))render();
+  unifiedRun=result.unified||null;
+  if(['map','fleet','demo','portfolio','ledger'].includes(activePage))render();
 }
 
 function fleetDefaults(scenario){

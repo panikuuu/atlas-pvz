@@ -63,7 +63,8 @@ function ledgerPage(){
     '</select><input type="date" id="ledger-day" aria-label="Дата проводки" value="'+esc(ledgerDay)+'"></div>';
   const book=table(['Дата, мск','Услуга','Откуда → кому','Заказ / партия','Сумма','Версия'],entries.slice(ledgerPageNo*30,ledgerPageNo*30+30).map(e=>[tm(e.at),esc(service(e.service))+(e.reversal_of?'<div class="micro">Сторно '+esc(e.reversal_of)+'</div>':''),esc(party(e.from_party)+' → '+party(e.to_party)),esc(e.order_id||e.lot_id),money(e.amount),esc(e.rate_version)]),'Проводок по этому фильтру нет.');
   const paging='<div class="panel-head"><span class="micro">'+num(entries.length)+' записей · Страница '+(ledgerPageNo+1)+' из '+pages+'</span><div class="section-actions">'+button('ledger-prev','Назад','',false,ledgerPageNo===0?'disabled':'')+button('ledger-next','Далее','',false,ledgerPageNo+1>=pages?'disabled':'')+'</div></div>';
-  return title('Начисления',prof(s.profile)+' · Журнал фактически оказанных услуг','<a class="btn" href="/economics.md" download="economics.md">Формулы расчёта</a>')+
+  const shift=unifiedRun?.title||scenarios[s.scenario]?.[0]||'Текущая смена';
+  return title('Начисления',shift+' · '+prof(s.profile)+' · Журнал фактически оказанных услуг','<a class="btn" href="/economics.md" download="economics.md">Формулы расчёта</a>')+
     (role==='seller'?panel('Результат продавца',pad(dl([['Прибыль с учётом затрат',money(t.seller_profit)]]))):stats([['wallet','Расходы RWB',money(t.rwb_cost)],['receipt','Доход RWB',money(t.rwb_revenue)],['trend','Вклад RWB',money(t.rwb_contribution)],['box','Прибыль продавца',money(t.seller_profit)]]))+
     (role!=='seller'?panel('Доход пунктов выдачи',table(['ПВЗ','Начислено','Труд и площадь','Прибыль','В т. ч. обычная выдача¹'],
       pointIds.map(p=>[esc(loc(p)),money(t.pvz_revenue?.[p]??0),money(t.pvz_cost?.[p]??0),money(t.pvz_profit?.[p]??0),money(issuance[p]||0)]))+
@@ -97,28 +98,60 @@ function demandPage(){
     '<p class="map-legend">75 баллов — 75% опорного уровня после поправки на объём и регулярность истории. При полной истории это около 1,5 взвешенного заказа в сутки.</p>');
 }
 
+function shiftEconomy(){
+  const summary=unifiedRun?.summary;
+  if(!summary)return '';
+  const plan=summary.plan;
+  const t=s.totals;
+  return panel('Текущая смена · '+unifiedRun.title,pad('<div class="stack">'+
+    stats([['box','Заказы в смене',num(summary.orders)],['receipt','Проводки',num(summary.ledger_entries)],
+      ['wallet','Фактические расходы RWB',money(t.rwb_cost)],['trend','Фактический вклад RWB',money(t.rwb_contribution)]])+
+    (plan?dl([['План · все заказы через хаб',money(plan.all_hub)],['План · парк и остаток через хаб',money(plan.total)],
+      ['Плановый эффект RWB',signed(plan.savings)],['Заказы парком / через хаб',num(plan.fleet_orders)+' / '+num(plan.hub_orders)],
+      ['Факт · результат продавца',money(t.seller_profit)]])
+      :'<p class="sub">Сравнение с хабом появится после расчёта парка. Проводки отражают операции, выполненные на текущем шаге.</p>')+
+    '<p class="micro">План сравнивает доставку одного набора заказов. Факт берётся из журнала смены и включает проведённые складские операции.</p>'+
+    button('unified-open','Открыть начисления','receipt',false,'data-id="ledger"')+'</div>'));
+}
+
 function portfolioPage(){
   const p=portfolio||s.portfolio||{},share=p.orders?p.direct/p.orders*100:0;
   const controls='<div class="filterline"><label>Спрос <select id="demand">'+[['low','Низкий'],['neutral','Нейтральный'],['high','Высокий']].map(([v,l])=>'<option value="'+v+'" '+(demand===v?'selected':'')+'>'+l+'</option>').join('')+'</select></label><label>Согласие на позднее окно <select id="consent">'+[0,5,15,30].map(v=>'<option '+(consent===v?'selected':'')+' value="'+v+'">'+v+'%</option>').join('')+'</select></label></div>';
-  return title('Экономика программы','Портфель на 28 дней · Направления из исходной книги',
+  return title('Экономика','Рабочий день и портфель на 28 дней',
     button('fleet-scenario','Расчёт по девяти ПВЗ','truck',true,'data-id="network"')+button('profile',prof(s.profile),'contract')+
     '<a class="btn" href="/economics.md" download="economics.md">Формулы расчёта</a>')+
-    stats([['box','Заказов в потоке',num(p.orders)],['truck','Прямых отправлений',num(p.direct)],['hub','Через хаб',num(p.hub)],['trend','Эффект RWB за цикл',signed(p.rwb_delta)]])+
-    panel('Параметры портфеля',pad(controls))+
+    shiftEconomy()+
+    panel('Прогноз на 28 дней',pad('<div class="stack">'+controls+
+      stats([['box','Заказов в потоке',num(p.orders)],['truck','Прямых отправлений',num(p.direct)],['hub','Через хаб',num(p.hub)],['trend','Эффект RWB за цикл',signed(p.rwb_delta)]])+'</div>'))+
     '<div class="two-col spaced">'+panel('Результат RWB',pad(dl([['Экономия на операциях',signed(p.operating_savings)],['Изменение тарифной выручки',signed(p.tariff_delta)],['Координация',money(p.coordination)],['Результат за цикл',signed(p.rwb_delta)],['Разовый запуск',money(p.startup)],['После запуска',signed(p.after_startup)]])))+
     panel('Результат участников',pad(dl([['Прирост прибыли ПВЗ',signed(p.pvz_delta)],['Прирост прибыли продавцов',signed(p.seller_delta)],['Доля прямых заказов',num(share)+'% ('+num(p.direct)+' / '+num(p.orders)+')'],['Обходов хаба',num(p.direct)],['Исключено кг·км',num(p.avoided_kg_km)],['Средняя готовность',num(p.mean_ready_hours)+' ч']])) )+'</div>'+
     panel('Добровольное позднее окно',pad(dl([['Выбрали перенос для доставки',num(p.shifted)+' из '+num(p.orders)],['Дополнительный эффект',signed(p.extra_effect)],['Исходное обещание выполнено',num(p.on_time_original==null?null:p.on_time_original*100)+'%'],['Выбранное обещание выполнено',num(p.on_time_current==null?null:p.on_time_current*100)+'%']])))+
     panel('Прогноз пополнения',pad(button('demand-page','Открыть индекс спроса','trend')));
 }
+function unifiedPanel(){
+  const u=unifiedRun;
+  const links=[['stock','Склад','box'],['orders','Заказы','route'],['map','Карта','map'],['fleet','Парк машин','truck'],
+    ['ledger','Начисления','receipt'],['portfolio','Экономика','chart'],['demand','Индекс спроса','trend']];
+  const description='Один набор заказов от приёмки до выдачи, передачи между машинами и начислений.';
+  return panel('Рабочий день сети',pad('<div class="stack">'+
+    (u?('<div class="section-actions">'+chip('Шаг '+u.stage+' из '+u.steps.length,u.finished?'good':'accent')+'</div>'+
+      '<ol class="step-list">'+u.steps.map(({label},i)=>'<li class="'+(i<u.stage?'done':i===u.stage?'next':'')+'">'+esc(label)+(i<u.stage?' ✓':'')+'</li>').join('')+'</ol>'+
+      '<div class="section-actions">'+(u.finished?chip('Смена пройдена','good'):button('unified-next',u.next_label,'arrow',true))+
+      button('unified-start','Начать заново','refresh')+'</div>'+
+      '<div class="section-actions">'+links.map(([id,label,iconName])=>button('unified-open',label,iconName,false,'data-id="'+id+'"')).join('')+'</div>')
+      :'<p class="sub">'+description+'</p><div class="section-actions">'+button('unified-start','Начать рабочий день','play',true)+'</div>')+'</div>'));
+}
+
 function demoPage(){
   const idx=s.step??0,count=s.steps.length,done=idx>=count;
   const workdays=Object.entries(fleetSettings?.scenarios||{}).filter(([,item])=>item.description)
     .map(([id,item])=>'<div class="scenario-row"><div class="grow"><h3>'+esc(item.title)+'</h3><p>'+esc(item.description)+
       '</p></div>'+button('fleet-scenario','Настроить и рассчитать','truck',false,'data-id="'+esc(id)+'"')+'</div>');
   return title('Демо-сценарии','Сквозные проверки операций, остатков и начислений',button('map-page','Карта рейсов','map'))+
+    unifiedPanel()+
+    (!unifiedRun?panel(scenarios[s.scenario]?.[0]||'Активная смена',pad('<div class="stack"><div class="section-actions">'+chip(prof(s.profile),'accent')+chip(s.fixture_version||'golden-v1')+chip(count?'Шаг '+idx+' из '+count:'Свободная смена')+'</div>'+(count?'<ol class="step-list">'+s.steps.map((x,i)=>'<li class="'+(i<idx?'done':i===idx?'next':'')+'">'+esc(x.label)+(i<idx?' ✓':'')+'</li>').join('')+'</ol><div class="section-actions">'+button('demo-step','Следующий шаг','arrow',true,done?'disabled':'')+button('demo-run','Пройти до конца','play',false,done?'disabled':'')+'</div>':'')+
+    (s.replay_check?'<div class="notice">Повторены два скана. Новых движений, начислений и инцидентов: '+[s.replay_check.movements,s.replay_check.ledger,s.replay_check.incidents].join(' / ')+'. Изменение количества: HTTP '+s.replay_check.changed_body_status+'.</div>':'')+dl([['Физический остаток в сети',num(s.totals.network_units)+' шт.'],['Фактические расходы RWB',money(s.totals.rwb_cost)],['Готовы к исходному сроку',num(s.totals.on_time)+' из '+num(s.totals.ready_count)]])+'</div>')):'')+
     panel('Рабочие дни парка',workdays.length?workdays.join(''):empty('Загружаем рабочие дни…'))+
-    panel(scenarios[s.scenario]?.[0]||'Активная смена',pad('<div class="stack"><div class="section-actions">'+chip(prof(s.profile),'accent')+chip(s.fixture_version||'golden-v1')+chip(count?'Шаг '+idx+' из '+count:'Свободная смена')+'</div>'+(count?'<ol class="step-list">'+s.steps.map((x,i)=>'<li class="'+(i<idx?'done':i===idx?'next':'')+'">'+esc(x.label)+(i<idx?' ✓':'')+'</li>').join('')+'</ol><div class="section-actions">'+button('demo-step','Следующий шаг','arrow',true,done?'disabled':'')+button('demo-run','Пройти до конца','play',false,done?'disabled':'')+'</div>':'')+
-    (s.replay_check?'<div class="notice">Повторены два скана. Новых движений, начислений и инцидентов: '+[s.replay_check.movements,s.replay_check.ledger,s.replay_check.incidents].join(' / ')+'. Изменение количества: HTTP '+s.replay_check.changed_body_status+'.</div>':'')+dl([['Физический остаток в сети',num(s.totals.network_units)+' шт.'],['Фактические расходы RWB',money(s.totals.rwb_cost)],['Готовы к исходному сроку',num(s.totals.on_time)+' из '+num(s.totals.ready_count)]])+'</div>'))+
     panel('Выбрать сценарий',Object.entries(scenarios).map(([id,[n,desc]],i)=>'<div class="scenario-row '+(s.scenario===id?'active':'')+'"><span class="scenario-id">'+(i<5?'0'+(i+1):icon(i===5?'map':'box',17))+'</span><div class="grow"><h3>'+esc(n)+'</h3><p>'+esc(desc)+'</p></div>'+button('reset','Начать','',false,'data-id="'+id+'"')+'</div>').join(''));
 }
 function metricsPage(){

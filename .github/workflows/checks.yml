@@ -18,6 +18,18 @@ jobs:
           docker compose exec -T atlas sh -c 'cat > /tmp/test_cases.py' < tests/test_cases.py
           docker compose exec -T -e PYTHONPATH=/tmp atlas python - --app /srv/atlas < tests/test_truck_runs.py
           docker compose exec -T -e PYTHONPATH=/tmp atlas python - --app /srv/atlas < tests/test_fleet.py
+          docker compose exec -T -e PYTHONPATH=/tmp atlas python - --app /srv/atlas < tests/test_unified_demo.py
+      - name: Check demand, geography and stock placement
+        run: |
+          docker compose run --rm -T -v "$PWD/tests:/srv/tests:ro" atlas sh -ec '
+            mkdir -p /tmp/check
+            ln -s /srv/atlas /tmp/check/app
+            cp -R /srv/tests /tmp/check/tests
+            cd /tmp/check
+            python tests/test_demand.py
+            python tests/test_geography.py
+            python tests/test_stock_placement.py
+          '
       - if: always()
         run: docker compose logs && docker compose down
   windows:
@@ -36,6 +48,10 @@ jobs:
           python tests/test_cases.py --exe dist/Atlas-PVZ.exe
           python tests/test_truck_runs.py --exe dist/Atlas-PVZ.exe
           python tests/test_fleet.py --exe dist/Atlas-PVZ.exe
+          python tests/test_unified_demo.py --exe dist/Atlas-PVZ.exe
+          python tests/test_demand.py
+          python tests/test_geography.py
+          python tests/test_stock_placement.py
           python tests/test_desktop.py --exe dist/Atlas-PVZ.exe
       - uses: actions/upload-artifact@v4
         with:

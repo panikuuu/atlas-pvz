@@ -129,6 +129,38 @@ class GeographyTests(unittest.TestCase):
         self.assertEqual(rural["selected"], "SHARED_TRIP")
         self.assertGreater(rural["savings"], 0)
 
+    def test_two_cities_use_the_stock_route_and_fall_back_to_hub_without_capacity(self):
+        with TemporaryDirectory() as data, isolated_server(APP, data_dir=data) as base:
+            request(base, "/api/demo/reset", {"scenario": "sandbox"})
+            with closing(sqlite3.connect(Path(data) / "catalog.sqlite")) as catalog:
+                workspace = Path(data) / catalog.execute("SELECT name FROM active").fetchone()[0]
+            with closing(sqlite3.connect(workspace)) as db, db:
+                db.execute("INSERT INTO geo_settlements VALUES (?, ?, ?, ?, ?)",
+                           ("north-priozersk", "north", "Северная область", "Приозёрск", "city"))
+                db.execute("UPDATE geo_pvz SET locality_id=? WHERE point_id=?",
+                           ("north-priozersk", "E"))
+
+            request(base, "/api/direction", {"source": "E", "destination": "B"})
+            intercity = create_order(base, "INTERCITY", "E", "B")
+            geo = intercity["geography"]
+            self.assertEqual((geo["relation"], geo["route_scope"]), ("different_localities", "intercity"))
+            self.assertEqual(geo["seller_ship_from"]["locality"]["id"], "north-priozersk")
+            self.assertEqual(geo["buyer_pickup"]["locality"]["id"], "north-novoozersk")
+            self.assertGreater(geo["road_km"], 0)
+
+            open_shared_window(base)
+            self.assertEqual(quote(base, intercity["id"])["selected"], "SHARED_TRIP")
+            request(base, "/api/settings", {"settings": {"shared_slots": 0, "dedicated_slots": 0}})
+            self.assertEqual(quote(base, intercity["id"])["selected"], "HUB")
+
+            request(base, "/api/direction", {"source": "A", "destination": "B"})
+            stocked_locally = create_order(base, "LOCAL-STOCK", "A", "B", seller_ship_from_pvz_id="E")
+            geo = stocked_locally["geography"]
+            self.assertEqual((geo["relation"], geo["route_scope"]), ("different_localities", "local"))
+            self.assertEqual(geo["stock_start"]["point_id"], "A")
+            open_shared_window(base)
+            self.assertEqual(quote(base, stocked_locally["id"])["selected"], "SHARED_TRIP")
+
     def test_route_and_handoff_start_at_stock_even_when_seller_matches_buyer(self):
         base = self.start_sandbox()
         order = create_order(base, "PREPOSITIONED", "C", "B", seller_ship_from_pvz_id="A")
