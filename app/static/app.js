@@ -78,11 +78,13 @@ function render(){
   $('#crumb').innerHTML='Рабочее место <b> / '+esc(pages[activePage][1])+'</b>';
   $('#clock-control').innerHTML=icon('clock',15)+'<span>'+esc(tm(s.now))+'</span><span class="clock-long">мск</span>';
   main.innerHTML=({map:mapPage,orders:ordersPage,stock:stockPage,ledger:ledgerPage,portfolio:portfolioPage,demo:demoPage,metrics:metricsPage})[activePage]();
+  if(activePage==='map')bindMapControls(document.getElementById('city-map'));
   main.setAttribute('aria-busy','false');
 }
 function routeState(){return {src:s.settings.source||'A',dest:s.settings.destination||'B',q:s.quote||null}}
 function mapPage(){
   const {src,dest,q}=routeState(),{totals:t}=s,selected=q?.selected,candidates=q?.candidates||[];
+  const plan=currentTruckPlan();
   const eligibleOrders=s.orders.filter(o=>o.source===src&&o.destination===dest&&['RESERVED','ASSEMBLED'].includes(o.status));
   const candidate=q?.candidates?.find(c=>c.mode===selected);
   const ready=eligibleOrders.length,savings=q?.savings??candidate?.savings;
@@ -95,13 +97,22 @@ function mapPage(){
       money(candidate.lost_tariff_revenue) + ' из-за скидки продавцу.</p>';
   }
   routeInfo+='<div class="route-actions">'+(q?button('compare','Сравнить варианты','layers',true):button('quote','Рассчитать рейс','route',true,!ready?'disabled':''))+(q?button('dispatch',hasManifest?'Закреплён':'Закрепить','',false,hasManifest||!eligibleOrders.some(o=>o.status==='ASSEMBLED')||selected==='MANUAL_EXCEPTION'?'disabled':''):'')+'</div>';
-  const mapHeader='<div class="panel-head"><div class="section-title">'+icon('map',19)+'<h2>Схема сети</h2></div><div class="section-actions">'+(s.scenario==='sandbox'?button('direction','Направление','route'):'')+button('network-plan','План сети','layers')+button('settings','Условия рейса','filter')+'</div></div>';
-  const mapVisual='<div class="map-wrap">'+networkMap(src,dest,selected,ready)+'<div class="map-tools">'+[['minus','Уменьшить'],['plus','Увеличить'],['fit','Вся сеть']].map(([a,v])=>'<button data-action="zoom-'+a+'" title="'+v+'" aria-label="'+v+'">'+icon(a,15)+'</button>').join('')+'</div></div><div class="map-legend">'+[['','Прямой рейс'],['dashed','Через хаб'],['gray','Вне выбранного рейса']].map(([a,v])=>'<span class="legend-item"><i class="legend-stroke '+a+'"></i>'+v+'</span>').join('')+'</div>';
+  const mapHeader='<div class="panel-head"><div class="section-title">'+icon('map',19)+'<h2>Схема сети</h2></div><div class="section-actions">'+
+    (s.scenario==='sandbox'?button('direction','Направление','route'):'')+
+    button('network-plan','План сети','layers')+button('settings','Условия рейса','filter')+
+    button('truck-form','Спланировать рейс','truck',true)+'</div></div>';
+  const legend=plan?.included.length?[['truck','Запланированный рейс'],['stop','Номер остановки']]:
+    [['','Прямой рейс'],['dashed','Через хаб'],['gray','Вне выбранного рейса']];
+  const mapVisual='<div class="map-wrap">'+networkMap(src,dest,selected,plan?.included.length?plan:null)+
+    '<div class="map-tools">'+[['minus','Уменьшить'],['plus','Увеличить'],['fit','Вся сеть']].map(([a,v])=>'<button data-action="zoom-'+a+'" title="'+v+'" aria-label="'+v+'">'+icon(a,15)+'</button>').join('')+
+    '</div></div><div class="map-legend">'+legend.map(([a,v])=>'<span class="legend-item"><i class="legend-stroke '+a+'"></i>'+v+'</span>').join('')+'</div>';
   const dir=pointName(src)+' → '+pointName(dest);
   return title('Карта рейсов','Учебная агломерация · '+tm(s.now).split(',')[0]+' · Московское время',button('profile',prof(s.profile),'contract'))+
-    stats([['box','Заказов в направлении',num(s.orders.filter(o=>o.source===src&&o.destination===dest).length)],['truck','Свободных попутных мест',num(s.settings.shared_slots)],['target','Индекс рейса, из 100',num(q?.index??candidate?.index)],['trend','Экономия по расчёту',signed(savings)]])+
-    '<div class="map-grid"><section class="panel">'+mapHeader+mapVisual+'</section><section class="panel route-panel">'+routeInfo+'</section></div>'+
+    (plan?'':stats([['box','Заказов в направлении',num(s.orders.filter(o=>o.source===src&&o.destination===dest).length)],['truck','Свободных попутных мест',num(s.settings.shared_slots)],['target','Индекс рейса, из 100',num(q?.index??candidate?.index)],['trend','Экономия по расчёту',signed(savings)]]))+
+    '<div class="map-grid'+(plan?' has-itinerary':'')+'"><section class="panel">'+mapHeader+mapVisual+'</section>'+
+    (plan?truckItinerary(plan):'<section class="panel route-panel">'+routeInfo+'</section>')+'</div>'+
+    (plan?'':(
     panel('Направления смены',table(['Направление','Заказы к окну','Попутный остаток','Решение','Экономия'],[[linkButton(q?'compare':'settings',src+'-'+dest,dir),esc(ready)+' шт.',esc(num(s.settings.shared_slots))+' мест',chip(modes[selected]||'Ожидает расчёта',q?'accent':''),signed(savings)]]),button('demo-page','Демо-сценарии','play'))+
-    panel('Результат по факту',pad(dl([['Вклад RWB',money(t.rwb_contribution)],['Эффект программы против централизованной схемы',signed(t.program_delta)],['Готовы к исходному сроку',num(t.on_time)+' из '+num(t.ready_count)]])));
+    panel('Результат по факту',pad(dl([['Вклад RWB',money(t.rwb_contribution)],['Эффект программы против централизованной схемы',signed(t.program_delta)],['Готовы к исходному сроку',num(t.on_time)+' из '+num(t.ready_count)]])))));
 }
 window.addEventListener('hashchange',()=>{const p=location.hash.slice(1);if(p!==activePage&&allowedPages[role].includes(p))go(p)});

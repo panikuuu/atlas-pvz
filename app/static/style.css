@@ -53,8 +53,10 @@
 
 /* The road atlas spans the work area; costs remain visible immediately below it. */
 .map-grid { grid-template-columns: minmax(0,1fr); }
-.map-wrap { display:block; min-height:0; overflow-x:auto; }
-#city-map { width:100%; min-width:620px; max-height:600px; }
+.map-wrap { display:block; min-height:0; overflow:hidden; background:#e9edda; }
+#city-map { display:block; width:100%; height:auto; aspect-ratio:1040 / 510; touch-action:none; cursor:grab; user-select:none; }
+#city-map.is-panning { cursor:grabbing; }
+.map-point { cursor:pointer; }
 .map-name { font:600 13px "Segoe UI",sans-serif; fill:#233632; paint-order:stroke; stroke:#fffdf5; stroke-width:4px; stroke-linejoin:round; }
 .map-district { fill:#65715d; font:600 12px "Segoe UI",sans-serif; letter-spacing:2px; }
 .route-panel .route-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
@@ -62,4 +64,35 @@
   .route-panel { display:grid; grid-template-columns:minmax(200px,0.9fr) minmax(420px,2fr); align-items:center; }
   .route-panel .route-actions { grid-column:1/-1; justify-content:flex-end; }
   .route-panel .tariff-note { grid-column:1/-1; }
+}
+.legend-stroke.truck { border-color:#087366; }
+.legend-stroke.stop { width:11px; height:11px; border:0; border-radius:50%; background:#086b60; }
+.truck-itinerary .panel-head { align-items:flex-start; flex-wrap:wrap; gap:10px; }
+.truck-itinerary:focus { outline:none; }
+.truck-totals { padding:0 18px; }
+.truck-totals .data-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:6px 16px; margin:0; }
+.truck-itinerary .truck-timeline { padding:8px 18px; margin:0; list-style:none; }
+.truck-timeline > li { display:grid; grid-template-columns:minmax(145px,1.1fr) minmax(142px,1fr) minmax(90px,.65fr); gap:5px 14px; align-items:center; padding:9px 0; border-top:1px solid var(--line); }
+.truck-stop { display:flex; align-items:center; gap:9px; border:0; background:none; text-align:left; padding:0; justify-self:start; }
+.truck-stop:hover strong { text-decoration:underline; }
+.truck-number { width:27px; height:27px; display:grid; place-items:center; flex:none; border-radius:50%; background:#086b60; color:white; font-weight:700; }
+.truck-stop small { display:block; color:var(--muted); }
+.truck-operations { display:flex; flex-wrap:wrap; gap:4px; font-size:12px; }
+.truck-operations span { padding:3px 7px; border-radius:5px; background:#f0eff2; }
+.truck-operations .truck-drop { background:#def2e9; color:#075b49; }
+.truck-operations .truck-pickup { background:#e9edf9; color:#303e77; }
+.truck-load { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; }
+.truck-timeline details { grid-column:1/-1; padding-left:36px; font-size:12px; }
+.truck-timeline summary { width:fit-content; color:var(--muted); }
+.truck-exceptions,.truck-economics { margin:4px 18px 14px; border-top:1px solid var(--line); padding-top:9px; }
+@media(min-width:1220px) {
+  .map-grid.has-itinerary { grid-template-columns:minmax(0,1fr) 365px; align-items:start; }
+  .has-itinerary .truck-itinerary { max-height:calc(100vh - 148px); overflow:auto; }
+  .has-itinerary .truck-itinerary > .panel-head { position:sticky; top:0; z-index:1; border-bottom:1px solid var(--line); background:white; }
+  .has-itinerary .truck-timeline > li { grid-template-columns:minmax(120px,1fr) 1fr; }
+  .has-itinerary .truck-load { grid-column:2; }
+}
+@media(max-width:560px) {
+  .truck-timeline > li { grid-template-columns:minmax(115px,1fr) 1fr; }
+  .truck-load { grid-column:2; }
 }

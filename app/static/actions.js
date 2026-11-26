@@ -99,10 +99,20 @@ function download(){
 }
 async function act(a,el){
   const id=el.dataset.id,kind=el.dataset.kind;
-  if(a.startsWith('zoom-')){zoom=a==='zoom-fit'?1:Math.max(1,Math.min(2,zoom+(a==='zoom-plus'?.25:-.25)));render();return;}
+  if(a==='zoom-fit'){moveMap(0,0,1);return;}
+  if(a==='zoom-plus'||a==='zoom-minus'){zoomMap(a==='zoom-plus'?1.35:1/1.35);return;}
   const handlers={
     direction:()=>dialogBox('Рабочее направление',form('direction-form',selectField('Рейс','lane',['AB','BA','CD','DC','AC'].map(p=>[p,loc(p[0])+' → '+loc(p[1])]),s.settings.source+s.settings.destination),'Открыть окно')),
     'network-plan':openPlan,'plan-edge':()=>planEdge(id),
+    'truck-form':truckForm,'truck-export':exportTruck,
+    'truck-clear':()=>{truckPlan=null;moveMap(0,0,1);render();},
+    'truck-stop':()=>{
+      const stop=truckPlan?.stops[Number(id)],point=stations[stop?.id];
+      if(!point)return;
+      const scale=Math.max(2.2,mapCamera.scale);
+      moveMap(point.x-mapWidth/scale/2,point.y-mapHeight/scale/2,scale);
+      document.querySelector('#city-map')?.scrollIntoView({block:'nearest'});
+    },
     'decision':async()=>{
       const q=await api('routing/quotes/'+encodeURIComponent(id));
       dialogBox('Решение '+q.quote_id,'<div class="stack">'+dl([['Дата расчёта',tm(q.fixed_at)],['Договор',q.tariff_version],['Окно',q.window_id],['Версия',q.version],['Заказы',q.order_ids.join(', ')],['Решение',modes[q.selected]],['Причина',reasons[q.reason]],['Экономия',signed(q.savings)]])+table(['Вариант','Ограничение или причина','Готовность','Опоздание'],q.candidates.map(c=>[modes[c.mode],esc(reasons[c.reason]||c.reason),num(c.ready_hours)+' ч',c.late_hours==null?'Нет оценки':num(c.late_hours)+' ч']))+'</div>');
@@ -161,8 +171,9 @@ document.addEventListener('submit',e=>{
     switch(f.id){
       case 'direction-form':await change('direction',{source:d.lane[0],destination:d.lane[1]},'Выбрано окно направления.');break;
       case 'plan-filter':slice=d;await openPlan();break;
+      case 'truck-form':calculateTruck(d);break;
       case 'order-search':orderSearch=d.search.trim();render();break;
-      case 'reset-form':zoom=1;await change('demo/reset',{scenario:d.scenario},'Открыта чистая смена.');break;
+      case 'reset-form':truckPlan=null;moveMap(0,0,1);await change('demo/reset',{scenario:d.scenario},'Открыта чистая смена.');break;
       case 'clock-form':await change('clock',{now:d.now+':00+03:00'},'Часы переведены.');break;
       case 'profile-form':await change('profile',{profile:d.profile},'Активный договор обновлён.');break;
       case 'conditions':{
