@@ -37,7 +37,7 @@ function ledgerPage(){
   const controls='<div class="filterline"><select id="ledger-party" aria-label="Участник">'+opts(partyOpts,ledgerParty,'Все участники')+'</select><select id="ledger-lot" aria-label="Партия">'+opts(s.lots.map(l=>l.id),ledgerLot,'Все партии')+'</select><input type="date" id="ledger-day" aria-label="Дата проводки" value="'+esc(ledgerDay)+'"></div>';
   const book=table(['Дата, мск','Услуга','Откуда → кому','Заказ / партия','Сумма','Версия'],entries.slice(ledgerPageNo*30,ledgerPageNo*30+30).map(e=>[tm(e.at),esc(service(e.service))+(e.reversal_of?'<div class="micro">Сторно '+esc(e.reversal_of)+'</div>':''),esc(party(e.from_party)+' → '+party(e.to_party)),esc(e.order_id||e.lot_id),money(e.amount),esc(e.rate_version)]),'Проводок по этому фильтру нет.');
   const paging='<div class="panel-head"><span class="micro">'+num(entries.length)+' записей · Страница '+(ledgerPageNo+1)+' из '+pages+'</span><div class="section-actions">'+button('ledger-prev','Назад','',false,ledgerPageNo===0?'disabled':'')+button('ledger-next','Далее','',false,ledgerPageNo+1>=pages?'disabled':'')+'</div></div>';
-  return title('Начисления',prof(s.profile)+' · Журнал фактически оказанных услуг')+
+  return title('Начисления',prof(s.profile)+' · Журнал фактически оказанных услуг','<a class="btn" href="/economics.md" download="economics.md">Формулы расчёта</a>')+
     (role==='seller'?panel('Результат продавца',pad(dl([['Прибыль с учётом затрат',money(t.seller_profit)]]))):stats([['wallet','Расходы RWB',money(t.rwb_cost)],['receipt','Доход RWB',money(t.rwb_revenue)],['trend','Вклад RWB',money(t.rwb_contribution)],['box','Прибыль продавца',money(t.seller_profit)]]))+
     (role!=='seller'?panel('Доход пунктов выдачи',table(['ПВЗ','Начислено','Труд и площадь','Прибыль','В т. ч. обычная выдача¹'],Object.keys(t.pvz_revenue||{}).map(p=>[esc(loc(p)),money(t.pvz_revenue[p]),money(t.pvz_cost[p]),money(t.pvz_profit[p]),money(s.ledger.filter(e=>e.to_party===p&&e.service==='PICKUP').reduce((x,e)=>x+e.amount,0)-s.ledger.filter(e=>e.from_party===p&&e.service==='PICKUP_LABOR').reduce((x,e)=>x+e.amount,0))]))+'<div class="map-legend">¹ Маржа фактических выдач по базовой операции.</div>'):'')+
     panel('Проводки',book+paging,controls);
@@ -46,7 +46,9 @@ function portfolioPage(){
   const p=portfolio||s.portfolio||{},share=p.orders?p.direct/p.orders*100:0;
   const controls='<div class="filterline"><label>Спрос <select id="demand">'+[['low','Низкий'],['neutral','Нейтральный'],['high','Высокий']].map(([v,l])=>'<option value="'+v+'" '+(demand===v?'selected':'')+'>'+l+'</option>').join('')+'</select></label><label>Согласие на позднее окно <select id="consent">'+[0,5,15,30].map(v=>'<option '+(consent===v?'selected':'')+' value="'+v+'">'+v+'%</option>').join('')+'</select></label></div>';
   const f=s.forecast;
-  return title('Экономика программы','Модель за 28 дней · Данные демонстрационного портфеля',button('profile',prof(s.profile),'contract'))+
+  return title('Экономика программы','Портфель на 28 дней · Синтетический поток',
+    button('fleet-page','Расчёт рабочего дня','truck')+button('profile',prof(s.profile),'contract')+
+    '<a class="btn" href="/economics.md" download="economics.md">Формулы расчёта</a>')+
     stats([['box','Заказов в потоке',num(p.orders)],['truck','Прямых отправлений',num(p.direct)],['hub','Через хаб',num(p.hub)],['trend','Эффект RWB за цикл',signed(p.rwb_delta)]])+
     panel('Параметры портфеля',pad(controls))+
     '<div class="two-col spaced">'+panel('Результат RWB',pad(dl([['Экономия на операциях',signed(p.operating_savings)],['Изменение тарифной выручки',signed(p.tariff_delta)],['Координация',money(p.coordination)],['Результат за цикл',signed(p.rwb_delta)],['Разовый запуск',money(p.startup)],['После запуска',signed(p.after_startup)]])))+

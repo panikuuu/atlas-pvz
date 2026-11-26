@@ -102,6 +102,15 @@ async function act(a,el){
   if(a==='zoom-fit'){moveMap(0,0,1);return;}
   if(a==='zoom-plus'||a==='zoom-minus'){zoomMap(a==='zoom-plus'?1.35:1/1.35);return;}
   const handlers={
+    'fleet-page':()=>go('fleet'),'fleet-form':()=>fleetForm(),'fleet-refresh':loadFleet,'fleet-add':()=>changeFleetVehicles(),
+    'fleet-remove':()=>changeFleetVehicles(Number(id)),
+    'fleet-current':()=>{fleetDraft=null;fleetSelected=null;fleetFocus=null;render();},
+    'fleet-truck':()=>{fleetSelected=id;fleetFocus=null;moveMap(0,0,1);render();},
+    'fleet-stop':()=>{fleetFocus=Number(id);render();document.getElementById('city-map')?.scrollIntoView({block:'nearest'});},
+    'fleet-confirm':()=>dialogBox('Подтвердить план парка',form('fleet-confirm-form',
+      '<p>Подтверждение сохраняет маршруты и закрепляет заказы рабочей смены за машинами.</p>','Подтвердить план')),
+    'fleet-start':()=>fleetCommand('start'),'fleet-next':()=>fleetCommand('next'),
+    'fleet-scan':()=>fleetCommand('scan',{batch:id,operation:kind}),
     direction:()=>dialogBox('Рабочее направление',form('direction-form',selectField('Рейс','lane',['AB','BA','CD','DC','AC'].map(p=>[p,loc(p[0])+' → '+loc(p[1])]),s.settings.source+s.settings.destination),'Открыть окно')),
     'network-plan':openPlan,'plan-edge':()=>planEdge(id),
     'truck-form':truckForm,'truck-export':exportTruck,'truck-confirm':confirmTruck,
@@ -156,6 +165,7 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('change',async e=>{
  const el=e.target;
+ if(el.name==='fleet_scenario'){fleetForm(el.value);return;}
  if(el.id==='truck-cargo-only'){cargoOnly=el.checked;render();return;}
  if(el.id==='role'){
     if(busy){el.value=role;return;}role=el.value;localStorage.setItem('atlas-role',role);portfolio=null;ledgerParty='';ledgerLot='';ledgerDay='';ledgerPageNo=0;orderSearch='';activePage=allowedPages[role][0];location.hash=activePage;await refresh();return;
@@ -183,6 +193,8 @@ document.addEventListener('submit',e=>{
       case 'direction-form':await change('direction',{source:d.lane[0],destination:d.lane[1]},'Выбрано окно направления.');break;
       case 'plan-filter':slice=d;await openPlan();break;
       case 'truck-form':calculateTruck(d);break;
+      case 'fleet-plan-form':await calculateFleet();break;
+      case 'fleet-confirm-form':await fleetCommand('confirm');break;
       case 'truck-confirm-form':{
         const plan=currentTruckPlan();
         if(!plan)throw Error('Смена изменилась. Сначала пересчитайте маршрут.');
@@ -194,7 +206,7 @@ document.addEventListener('submit',e=>{
       case 'truck-next-form':await truckCommand(d.action,{acknowledge:true});break;
       case 'truck-cancel-form':await truckCommand('cancel');break;
       case 'order-search':orderSearch=d.search.trim();render();break;
-      case 'reset-form':truckPlan=null;showTruck=false;focusedTruckStop=null;moveMap(0,0,1);await change('demo/reset',{scenario:d.scenario},'Открыта чистая смена.');break;
+      case 'reset-form':truckPlan=null;showTruck=false;focusedTruckStop=null;fleetDraft=null;fleetDay=null;fleetSelected=null;moveMap(0,0,1);await change('demo/reset',{scenario:d.scenario},'Открыта чистая смена.');break;
       case 'clock-form':await change('clock',{now:d.now+':00+03:00'},'Часы переведены.');break;
       case 'profile-form':await change('profile',{profile:d.profile},'Активный договор обновлён.');break;
       case 'conditions':{

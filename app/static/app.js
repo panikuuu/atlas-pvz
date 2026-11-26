@@ -19,8 +19,8 @@ const reasons={DIRECT_SAVES_COST:'Прямая доставка экономит
 const states={RESERVED:'В резерве',ASSEMBLED:'Собран',ASSIGNED:'В манифесте',IN_TRANSIT:'В пути',READY_FOR_PICKUP:'Готов к выдаче',ISSUED:'Выдан',RETURN_INSPECTION:'На проверке',RETURN_IN_TRANSIT:'В обратном рейсе',RETURNED:'Возвращён',QUARANTINED:'В карантине',AVAILABLE:'Доступен',AT_HUB:'На хабе'};
 const processes={ASSEMBLED:'Собрать',HANDED_OVER:'Передать перевозчику',ARRIVED:'Принять в ПВЗ',ISSUED:'Выдать покупателю',RETURNED:'Принять возврат',RETURN_SENT:'Передать возврат',RETURN_RECEIVED:'Вернуть на полку',QUARANTINED:'В карантин',INCIDENT:'Открыть инцидент',RECOVERED:'Подтвердить восстановление',WITHDRAW_REQUESTED:'Заказать вывоз',WITHDRAW_SENT:'Передать на хаб',WITHDRAW_RECEIVED:'Подтвердить приёмку хабом'};
 const scenarios={case1:['Городская доставка','10 посылок из Центра в Университет одним попутным рейсом.'],case2:['Единичный заказ','Сравнение хаба с отдельным кругом при закрытом попутном окне.'],case3:['Возврат товара','Возврат одной выданной посылки на исходную полку.'],case4:['Частичный сбой','Приёмка девяти посылок, поиск десятой и повтор сообщения.'],case5:['Долгое хранение','30 суток хранения и вывоз непроданного остатка.'],rural:['Сельское плечо','Две посылки из Райцентра в Озёрное при обещании 48 часов.'],sandbox:['Свободная смена','Приёмка и обработка собственных тестовых заказов.']};
-const pages={map:['map','Карта рейсов'],orders:['route','Заказы'],stock:['box','Склад и смена'],ledger:['receipt','Начисления'],portfolio:['chart','Экономика'],demo:['play','Сценарии'],metrics:['activity','Диагностика'],truck:['truck','Текущий рейс']};
-const allowedPages={dispatcher:Object.keys(pages).filter(p=>p!=='truck'),pvz:['stock','orders','ledger','truck'],seller:['stock','orders','ledger']};
+const pages={map:['map','Карта рейсов'],fleet:['truck','Парк машин'],orders:['route','Заказы'],stock:['box','Склад и смена'],ledger:['receipt','Начисления'],portfolio:['chart','Экономика'],demo:['play','Сценарии'],metrics:['activity','Диагностика'],truck:['truck','Текущий рейс']};
+const allowedPages={dispatcher:Object.keys(pages).filter(p=>p!=='truck'),pvz:['stock','orders','ledger','truck','fleet'],seller:['stock','orders','ledger']};
 let role=localStorage.getItem('atlas-role')||'dispatcher';if(!allowedPages[role])role='dispatcher';
 let activePage=location.hash.slice(1);if(!allowedPages[role].includes(activePage))activePage=allowedPages[role][0];
 let s={},loadSequence=0,consent=0,portfolio=null,busy=false,toastTimer,sortOrders='id';
@@ -49,7 +49,7 @@ async function api(path,body){
   if(!r.ok){const d=data.detail||data.message||data.error;const detail=typeof d==='object'?(d.message||d.detail||JSON.stringify(d)):d;throw new Error((r.status===409?'Конфликт версии или остатка. ':'')+(reasons[detail]||detail||r.statusText)+' ('+r.status+')');}
   return data;
 }
-function go(page){if(!allowedPages[role].includes(page))page=allowedPages[role][0];activePage=page;location.hash=page;render();if(page==='portfolio')loadPortfolio().catch(showError)}
+function go(page){if(!allowedPages[role].includes(page))page=allowedPages[role][0];activePage=page;location.hash=page;render();if(page==='portfolio')loadPortfolio().catch(showError);if(page==='fleet')loadFleet().catch(showError)}
 function showError(err){
   const msg=err.message||String(err);if(dialog.open){
     $('#dialog-body .notice.error')?.remove();
@@ -69,7 +69,7 @@ async function refresh(){
     }
     s=state;s.orders??=[];s.lots??=[];s.ledger??=[];s.settings??={};s.points??=[];s.totals??={};s.metrics??={};s.steps??=[];
     $('#connection').textContent='Стенд на связи';$('#connection-dot').classList.add('live');
-    render();if(activePage==='portfolio')await loadPortfolio();
+    render();if(activePage==='portfolio')await loadPortfolio();if(activePage==='fleet')await loadFleet();
   }catch(e){if(seq!==loadSequence)return;
     $('#connection').textContent='Нет связи со стендом';$('#connection-dot').classList.remove('live');main.innerHTML=panel('Смена временно недоступна',pad('<div class="stack"><p>'+esc(e.message)+'</p>'+button('refresh','Повторить подключение','refresh')+'</div>'));main.setAttribute('aria-busy','false');}
 }
@@ -84,8 +84,8 @@ function render(){
   $('#nav').innerHTML=allowedPages[role].map((p,i)=>((i===4||i===5)?'<div class="nav-sep"></div>':'')+'<button class="nav-item '+(p===activePage?'current':'')+'" data-page="'+p+'" title="'+pages[p][1]+'" aria-label="'+pages[p][1]+'" '+(p===activePage?'aria-current="page"':'')+'>'+icon(pages[p][0],19)+'<span>'+pages[p][1]+'</span></button>').join('');
   $('#crumb').innerHTML='Рабочее место <b> / '+esc(pages[activePage][1])+'</b>';
   $('#clock-control').innerHTML=icon('clock',15)+'<span>'+esc(tm(s.now))+'</span><span class="clock-long">мск</span>';
-  main.innerHTML=({map:mapPage,orders:ordersPage,stock:stockPage,ledger:ledgerPage,portfolio:portfolioPage,demo:demoPage,metrics:metricsPage,truck:()=>title('Текущий рейс')+executionView(activeTruck)})[activePage]();
-  if(activePage==='map')bindMapControls(document.getElementById('city-map'));
+  main.innerHTML=({map:mapPage,fleet:fleetPage,orders:ordersPage,stock:stockPage,ledger:ledgerPage,portfolio:portfolioPage,demo:demoPage,metrics:metricsPage,truck:()=>title('Текущий рейс')+executionView(activeTruck)})[activePage]();
+  if(activePage==='map'||activePage==='fleet')bindMapControls(document.getElementById('city-map'));
   main.setAttribute('aria-busy','false');
 }
 function routeState(){return {src:s.settings.source||'A',dest:s.settings.destination||'B',q:s.quote||null}}

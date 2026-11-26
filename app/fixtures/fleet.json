@@ -1,0 +1,67 @@
+{
+  "prices": {
+    "diesel": 86.67,
+    "consumption": 24,
+    "wear": 12,
+    "driver_hour": 550,
+    "pvz_hour": 330,
+    "packing": 4,
+    "rebate": 7,
+    "expected_extra_risk": 3,
+    "transfer_handling": 6,
+    "coordination_day": 250,
+    "dedicated_fixed": 760,
+    "hub_city": 65,
+    "hub_rural": 105
+  },
+  "source": {
+    "diesel_date": "2026-10-12",
+    "diesel_url": "https://rosstat.gov.ru/storage/mediabank/159_14-10-2026.html",
+    "seller_tariffs_url": "https://seller.wildberries.ru/instructions/ru/ru/material/fees-site-section"
+  },
+  "windows": {
+    "A": [540, 1260], "B": [540, 1260], "C": [540, 1200], "D": [600, 1140],
+    "E": [540, 1200], "F": [540, 1200], "G": [600, 1140], "J": [600, 1140],
+    "K": [600, 1140], "HUB": [480, 1320]
+  },
+  "relays": { "B": 160, "C": 180 },
+  "scenarios": {
+    "weekday": {
+      "title": "Будний день",
+      "trucks": [
+        {"id":"М1","start":"F","end":"B","start_min":540,"end_min":690,"liters":160,"kg":110,"planned":true},
+        {"id":"М2","start":"B","end":"K","start_min":685,"end_min":1000,"liters":170,"kg":140,"planned":true},
+        {"id":"М3","start":"C","end":"D","start_min":650,"end_min":900,"liters":140,"kg":110,"planned":true}
+      ],
+      "batches": [
+        ["F","A",10,540,660], ["F","B",12,540,690], ["A","B",8,540,690],
+        ["F","K",14,540,1000], ["B","K",10,680,1000], ["C","D",16,630,900]
+      ]
+    },
+    "peak": {
+      "title": "Пиковый день",
+      "trucks": [
+        {"id":"М1","start":"F","end":"B","start_min":540,"end_min":740,"liters":140,"kg":110,"planned":true},
+        {"id":"М2","start":"B","end":"K","start_min":725,"end_min":1060,"liters":180,"kg":135,"planned":true},
+        {"id":"М3","start":"C","end":"D","start_min":640,"end_min":920,"liters":165,"kg":110,"planned":true},
+        {"id":"М4","start":"F","end":"B","start_min":625,"end_min":835,"liters":130,"kg":100,"planned":false}
+      ],
+      "batches": [
+        ["F","A",18,540,690], ["F","B",20,540,740], ["A","B",16,560,745],
+        ["F","K",16,540,1055], ["F","K",12,625,1060], ["B","K",17,725,1060],
+        ["C","D",24,640,900], ["B","J",14,725,1060], ["E","D",7,610,950]
+      ]
+    },
+    "quiet": {
+      "title": "Малый поток",
+      "trucks": [
+        {"id":"М1","start":"F","end":"B","start_min":540,"end_min":700,"liters":160,"kg":110,"planned":true},
+        {"id":"М2","start":"C","end":"D","start_min":650,"end_min":920,"liters":150,"kg":110,"planned":false}
+      ],
+      "batches": [
+        ["F","B",4,540,700], ["B","K",1,695,1050], ["G","J",2,665,1040],
+        ["C","D",2,630,920], ["D","F",1,650,940]
+      ]
+    }
+  }
+}

@@ -95,6 +95,11 @@
 .truck-alerts { margin:8px 18px; padding:8px 10px; color:#813f12; background:#fff1de; border-radius:8px; }
 .truck-alerts ul { margin:6px 0 0; padding-left:20px; }
 .truck-timeline > .current-stop { background:#edf6f3; }
+.fleet-vehicle { min-width:0; border:1px solid var(--line); border-radius:8px; padding:12px; margin:0; }
+.fleet-vehicle legend { font-weight:650; padding:0 6px; }
+.fleet-vehicle > button { margin-top:8px; }
+.fleet-task { margin:4px 0; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.fleet-task .btn { padding:4px 8px; }
 @media(min-width:1220px) {
   .map-grid.has-itinerary { grid-template-columns:minmax(0,1fr) 365px; align-items:start; }
   .has-itinerary .truck-itinerary { max-height:calc(100vh - 148px); overflow:auto; }

@@ -17,7 +17,7 @@ import time
 import winreg
 
 import server
-from truck_runs import TruckHandler
+from fleet_api import FleetHandler
 
 
 USER = ctypes.WinDLL("user32", use_last_error=True)
@@ -134,11 +134,11 @@ class LocalServer(server.ThreadingHTTPServer):
 
 def listen():
     try:
-        return LocalServer(("127.0.0.1", 8080), TruckHandler)
+        return LocalServer(("127.0.0.1", 8080), FleetHandler)
     except OSError as exc:
         if exc.winerror not in (10048, 10013):
             raise
-        return LocalServer(("127.0.0.1", 0), TruckHandler)
+        return LocalServer(("127.0.0.1", 0), FleetHandler)
 
 
 def desktop_window(port, lock, folder):
