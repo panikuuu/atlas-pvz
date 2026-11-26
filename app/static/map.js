@@ -80,21 +80,36 @@ let terrain;
 function mapTerrain(){
   if(terrain)return terrain;
   let buildings='',trees='',hamlets='';
+  const allRoads=roads.map(([from,to])=>roadGraph.get(from).find(e=>e.to===to));
+  const roadSegments=allRoads.flatMap(({coords})=>coords.slice(1).map((point,i)=>[coords[i],point]));
+  const occupied=[];
+  function freeSite(x,y,r){
+    const hasRoom=roadSegments.every(([a,b])=>{
+      const dx=b.x-a.x,dy=b.y-a.y;
+      const t=Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/(dx*dx+dy*dy)));
+      return Math.hypot(x-a.x-t*dx,y-a.y-t*dy)>r+8;
+    })&&occupied.every(([cx,cy,radius])=>Math.hypot(x-cx,y-cy)>r+radius+2);
+    if(hasRoom)occupied.push([x,y,r]);
+    return hasRoom;
+  }
   let seed=7321;
   function random(){
     seed=(seed*16807)%2147483647;
     return seed/2147483647;
   }
-  // City blocks end at the river. The opposite bank contains separated hamlets and cultivated strips.
-  for(let x=-18;x<435;x+=52)for(let y=-10;y<532;y+=47){
-    if((x>170 && x<290 && y<95)||(x>330 && y>390))continue;
-    const width=34+Math.floor(11*random()),height=27+Math.floor(10*random());
-    buildings+='<rect x="'+x+'" y="'+y+'" width="'+width+'" height="'+height+'" rx="3" fill="#deded3"/>'+
-      '<path transform="translate('+x+' '+y+')" d="M5 5h19v6H11v17H5zM28 13h10v18H28z" fill="#c5c7bf"/>';
+  // Build the blocks after reserving road space, the park and the industrial site by the hub.
+  for(let x=20;x<437;x+=29)for(let y=28;y<490;y+=30){
+    if((x>150&&x<295&&y<100)||(x>322&&y>350&&y<445)||(x>400&&y>445))continue;
+    const width=13+Math.floor(10*random()),height=10+Math.floor(10*random());
+    if(!freeSite(x,y,Math.hypot(width,height)/2+3))continue;
+    const left=x-width/2,top=y-height/2;
+    buildings+='<rect x="'+(left-3)+'" y="'+(top-3)+'" width="'+(width+6)+'" height="'+(height+6)+'" rx="2" fill="#e2e3d7"/>'+
+      '<rect x="'+left+'" y="'+top+'" width="'+width+'" height="'+height+'" rx="1.5" fill="'+(y>360?'#b6b9ad':'#c4c1b6')+'"/>';
   }
   for(const [x,y,nx,ny] of [[588,258,5,4],[841,137,4,2],[565,70,4,2],[782,379,4,2],[923,279,4,2]]){
     for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){
       const px=x+i*17+(j%2)*4,py=y+j*20+(i%2)*3;
+      if(!freeSite(px+4,py+2,9))continue;
       hamlets+='<g transform="translate('+px+' '+py+') rotate(-12)"><rect x="-2" y="-3" width="15" height="15" fill="#d5dcb9"/><rect width="10" height="7" fill="#bc9a7c"/><path d="M0 3h10" stroke="#977c69"/></g>';
     }
   }
@@ -103,7 +118,6 @@ function mapTerrain(){
     if(((x-750)/109)**2+((y-62)/55)**2<1)trees+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="#b2c7a4"/>';
   }
   const river='M481 -22C460 85 487 124 489 170S462 251 478 278S472 354 501 405S526 487 489 540';
-  const allRoads=roads.map(([from,to])=>roadGraph.get(from).find(e=>e.to===to));
   const crossings=[roadRoute('northBank','northBridge')[0],roadRoute('southBank','bridge')[0]];
   terrain='<defs><pattern id="fields" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(28)"><rect width="12" height="12" fill="#e7dfb9"/><path d="M2 0v12" stroke="#d8cfa6" stroke-width="2"/></pattern></defs>'+
     '<rect width="1040" height="510" fill="#e9edda"/><path d="M437 0H0v510h470l-34-89 13-97-24-84 29-87z" fill="#ecebe3"/>'+buildings+
@@ -111,6 +125,7 @@ function mapTerrain(){
     '<path d="M630 34q101-63 206-9l28 69-116 22-74-33zM169 12h110l-7 72-67 12-43-23z" fill="#cbdac0"/>'+trees+
     '<path d="M864 16q64-20 126 32l-11 39-58 8-15-23-40-12z" fill="#a8cdd2"/>'+
     '<path d="'+river+'" fill="none" stroke="#c8d9c0" stroke-width="38"/><path d="'+river+'" fill="none" stroke="#aed3d8" stroke-width="24"/>'+hamlets+
+    '<g fill="#b9bab1"><rect x="307" y="407" width="39" height="19" rx="2"/><rect x="368" y="413" width="35" height="16" rx="2"/></g>'+
     routeStroke(allRoads,'#c9c4b6',12)+routeStroke(crossings,'#898d7f',15)+routeStroke(allRoads,'#fffdf5',9)+
     '<g class="map-district"><text x="25" y="38">ГОРОДСКОЙ ОКРУГ</text><text x="624" y="480">СЕЛЬСКИЙ РАЙОН</text></g>';
   return terrain;
