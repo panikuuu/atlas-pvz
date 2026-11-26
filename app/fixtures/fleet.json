@@ -5,10 +5,12 @@
     "wear": 12,
     "driver_hour": 550,
     "pvz_hour": 330,
+    "pvz_internal_hour": 300,
     "packing": 4,
     "rebate": 7,
     "expected_extra_risk": 3,
     "transfer_handling": 6,
+    "transfer_internal": 4,
     "coordination_day": 250,
     "dedicated_fixed": 760,
     "hub_city": 65,
@@ -26,6 +28,20 @@
   },
   "relays": { "B": 160, "C": 180 },
   "scenarios": {
+    "network": {
+      "title": "Вся сеть · девять ПВЗ",
+      "trucks": [
+        {"id":"М1","start":"F","end":"B","start_min":540,"end_min":690,"liters":160,"kg":110,"planned":true},
+        {"id":"М2","start":"B","end":"K","start_min":685,"end_min":1100,"liters":170,"kg":140,"planned":true},
+        {"id":"М3","start":"C","end":"D","start_min":650,"end_min":900,"liters":140,"kg":110,"planned":true},
+        {"id":"М4","start":"E","end":"B","start_min":595,"end_min":780,"liters":140,"kg":115,"planned":true}
+      ],
+      "batches": [
+        ["F","A",10,540,660], ["F","B",12,540,690], ["A","B",8,540,690],
+        ["F","K",14,540,1000], ["B","K",10,680,1000], ["C","D",16,630,900],
+        ["E","B",14,590,780], ["G","D",14,680,1040], ["B","J",18,680,1100]
+      ]
+    },
     "weekday": {
       "title": "Будний день",
       "trucks": [

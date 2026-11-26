@@ -70,6 +70,19 @@ def execute(base,day):
 
 def verify(base):
     assert query(base)["day"] is None
+    network=preview(base,"network")["economics"]
+    rows=network["by_pvz"]
+    assert len(rows)==9 and all(row["work_minutes"]>0 for row in rows)
+    assert network["units"]==116 and network["relayed_units"]==14
+    assert sum(row["baseline"] for row in rows)==network["all_hub"]==1042000
+    assert sum(row["actual"] for row in rows)==network["total"]==491003
+    assert sum(row["rwb_effect"] for row in rows)==network["savings"]==550997
+    assert sum(row["pvz_revenue"] for row in rows)==network["costs"]["pvz"]+network["costs"]["transfer_handling"]
+    assert sum(row["pvz_margin"] for row in rows)==8450
+    assert sum(row["seller_rebate"] for row in rows)==network["costs"]["rebate"]
+    assert sum(row["pickup"] for row in rows)==sum(row["drop"] for row in rows)==116
+    assert sum(row["relay_drop"] for row in rows)==sum(row["relay_pickup"] for row in rows)==14
+    print("PASS nine PVZ: active stops and exact reconciliation of park, partners and seller rebates",flush=True)
     p=preview(base,"weekday")
     economics=p["economics"]
     assert (economics["units"],economics["relayed_units"],economics["savings"])==(70,14,380933)
@@ -79,6 +92,7 @@ def verify(base):
     assert (surge["total_units"],surge["units"],surge["relayed_units"])==(144,137,28)
     quiet=preview(base,"quiet")["economics"]
     assert quiet["units"]==quiet["savings"]==0 and quiet["active_trial_delta"]<0
+    assert len(quiet["by_pvz"])==9 and all(row["pvz_margin"]==0 for row in quiet["by_pvz"])
     stressed=preview(base,"weekday",prices={"hub_city":0,"hub_rural":0})["economics"]
     assert stressed["units"]==stressed["savings"]==0
     rejects(lambda:send(base,{"action":"confirm",**p["request"],"fingerprint":"stale"}),409)

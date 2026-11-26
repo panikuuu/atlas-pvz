@@ -261,6 +261,82 @@ def solve(vehicles,batches,prices,allow_transfer=True,volume_first=False):
     return {"trucks":trips,"economics":summarize(trips,batches,prices)}
 
 
+def split_cost(amount, weights):
+    """Split integer kopecks by weight and keep the exact original sum."""
+    if not weights:
+        return {}
+    total=sum(weights.values())
+    amounts={}
+    remainders=[]
+    for key,weight in weights.items():
+        amounts[key],remainder=divmod(amount*weight,total)
+        remainders.append((remainder,key))
+    residual=amount-sum(amounts.values())
+    for _,key in sorted(remainders,key=lambda x:(-x[0],x[1]))[:residual]:
+        amounts[key]+=1
+    return amounts
+
+
+def point_breakdown(trips,batches,prices,coordination):
+    # RWB's comparison is booked once at final destination. A source or relay
+    # earns a separate compensation for the operations actually scheduled there.
+    rows={point:Counter() for point in STATIONS}
+    batch_cost=Counter()
+    served,relayed=set(),set()
+    for trip in trips:
+        route_ids=set()
+        site_minutes=Counter()
+        for visit in trip["stops"]:
+            point=visit["point"]
+            for event in visit["events"]:
+                oid,kind,qty=event["batch"],event["kind"],event["qty"]
+                route_ids.add(oid)
+                rows[point][kind]+=qty
+                if kind=="drop":
+                    served.add(oid)
+                if kind=="relay_drop":
+                    relayed.add(oid)
+            if visit["events"]:
+                site_minutes[point]+=16+sum(event["qty"] for event in visit["events"])
+        for point,quarters in site_minutes.items():
+            rows[point]["work_quarters"]+=quarters
+        work_payout=split_cost(trip["costs"]["pvz"],site_minutes)
+        for point,payout in work_payout.items():
+            rows[point]["work_payout"]+=payout
+        weights={oid:batches[oid]["qty"] for oid in route_ids}
+        batch_cost.update(split_cost(sum(trip["costs"].values()),weights))
+    batch_cost.update(split_cost(coordination,{oid:batches[oid]["qty"] for oid in served}))
+    parcel_cost=sum(round(prices[key]*100) for key in ("packing","rebate","expected_extra_risk"))
+    for oid,batch in batches.items():
+        units=batch["qty"]
+        row=rows[batch["to"]]
+        baseline=estimate_hub(batch,prices)
+        row["requested"]+=units
+        row["baseline"]+=baseline
+        if oid in served:
+            row["actual"]+=batch_cost[oid]+units*parcel_cost
+            row["rebate"]+=units*round(prices["rebate"]*100)
+            if oid in relayed:
+                row["actual"]+=units*round(prices["transfer_handling"]*100)
+        else:
+            row["actual"]+=baseline
+            row["hub"]+=units
+    result=[]
+    for point,row in rows.items():
+        work_min=row["work_quarters"]/4
+        transfer=row["relay_drop"]
+        revenue=row["work_payout"]+transfer*round(prices["transfer_handling"]*100)
+        cost=round(work_min/60*prices["pvz_internal_hour"]*100)+transfer*round(prices["transfer_internal"]*100)
+        if point=="HUB" and not (row["requested"] or work_min):
+            continue
+        result.append({"point":point,"requested":row["requested"],"hub":row["hub"],
+            "pickup":row["pickup"],"drop":row["drop"],"relay_drop":transfer,"relay_pickup":row["relay_pickup"],
+            "work_minutes":work_min,"baseline":row["baseline"],"actual":row["actual"],
+            "rwb_effect":row["baseline"]-row["actual"],"seller_rebate":row["rebate"],
+            "pvz_revenue":revenue,"pvz_cost":cost,"pvz_margin":revenue-cost})
+    return result
+
+
 def plan(vehicles,batches,prices,allow_transfer=True):
     def best(transfer):
         return min((solve(vehicles,batches,prices,transfer,volume_first) for volume_first in (False,True)),
@@ -285,4 +361,5 @@ def plan(vehicles,batches,prices,allow_transfer=True):
     # The chosen variant can be the same object as the direct-only variant.
     if no_relay is economy:
         no_relay_total=economy["total"]
+    economy["by_pvz"]=point_breakdown(chosen["trucks"],batches,prices,day_fee)
     return {**chosen,"batches":batches,"prices":prices,"without_relay":no_relay_total}

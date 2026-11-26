@@ -4,9 +4,10 @@ let fleetDay=null,fleetDraft=null,fleetSettings=null,fleetSelected=null,fleetFoc
 let fleetFormState=null;
 const fleetNames={pickup:'Погрузить',drop:'Выгрузить к выдаче',relay_drop:'Передать в буфер',relay_pickup:'Забрать из буфера'};
 const fleetPriceNames={diesel:'Дизель, ₽/л',consumption:'Расход топлива, л/100 км',wear:'Обслуживание, ₽/км',
-  driver_hour:'Работа водителя, ₽/ч',pvz_hour:'Работа ПВЗ, ₽/ч',packing:'Упаковка, ₽/посылку',
+  driver_hour:'Работа водителя, ₽/ч',pvz_hour:'Компенсация работы ПВЗ, ₽/ч',
+  pvz_internal_hour:'Себестоимость труда ПВЗ, ₽/ч',packing:'Упаковка, ₽/посылку',
   rebate:'Скидка продавцу, ₽/посылку',expected_extra_risk:'Доп. риски, ₽/посылку',transfer_handling:'Доплата за передачу, ₽/посылку',
-  dedicated_fixed:'Выделенный выезд, ₽/машину',hub_city:'Устранимые расходы хаба, город, ₽/посылку',
+  transfer_internal:'Себестоимость буфера ПВЗ, ₽/посылку',dedicated_fixed:'Выделенный выезд, ₽/машину',hub_city:'Устранимые расходы хаба, город, ₽/посылку',
   hub_rural:'Устранимые расходы хаба, село, ₽/посылку',coordination_day:'Координация, ₽/день'};
 const fleetCostNames={fuel:'Топливо',wear:'Обслуживание машины',driver:'Время водителя',pvz:'Работа ПВЗ',dispatch:'Дополнительный выезд',
   packing:'Упаковка',rebate:'Снижение тарифной выручки',expected_extra_risk:'Ожидаемые дополнительные расходы',transfer_handling:'Доплата за передачу'};
@@ -117,7 +118,27 @@ function fleetEconomics(view){
       ['Координация',money(e.coordination)],['Отправления, оставшиеся на хабе',money(e.remaining_hub)]])+
     '<p class="notes">Дизель '+num(rates.diesel)+' ₽/л, расходы хаба '+num(rates.hub_city)+' ₽ в городе и '+num(rates.hub_rural)+' ₽ с сельским плечом на посылку. Все сценарии сравниваются на одинаковом потоке.</p></details>'+
     (e.hub_remaining.length?'<details><summary>Передано в базовую схему · '+num(e.total_units-e.units)+' посылок</summary>'+
-      table(['Партия','Направление','Посылки'],e.hub_remaining.map(b=>[esc(b.id),esc(loc(b.from)+' → '+loc(b.to)),num(b.qty)]))+'</details>':'')+'</div></section>';
+      table(['Партия','Направление','Посылки'],e.hub_remaining.map(b=>[esc(b.id),esc(loc(b.from)+' → '+loc(b.to)),num(b.qty)]))+'</details>':'')+
+    '</div></section>'+fleetPoints(e);
+}
+
+function fleetPoints(e){
+  if(!e.by_pvz)return '';
+  const sum=key=>e.by_pvz.reduce((total,p)=>total+p[key],0);
+  const finances=p=>[esc(loc(p.point)),num(p.requested),num(p.hub),money(p.baseline),money(p.actual),signed(p.rwb_effect)];
+  const partners=p=>[esc(loc(p.point)),num(p.pickup),num(p.drop),num(p.relay_drop+p.relay_pickup),num(p.work_minutes)+' мин',
+    money(p.pvz_revenue),money(p.pvz_cost),signed(p.pvz_margin),money(p.seller_rebate)];
+  return '<section class="panel spaced"><div class="panel-head"><h2>Экономика по ПВЗ</h2></div><div class="panel-body stack">'+
+    '<p class="notes">Результат RWB относится к ПВЗ выдачи. Если точка только отправляет груз, её работа видна в расчёте для партнёров.</p>'+
+    table(['ПВЗ выдачи','Заказы','Через хаб','База через хаб','Расходы по плану','Эффект RWB'],[
+      ...e.by_pvz.map(finances),['<strong>Всего</strong>',num(sum('requested')),num(sum('hub')),money(sum('baseline')),
+        money(sum('actual')),signed(sum('rwb_effect'))]])+
+    '<details><summary>Работа и экономика партнёров</summary>'+
+    '<p class="notes">Приём и передача на промежуточной точке считаются двумя операциями. Скидка продавцам показана по ПВЗ выдачи.</p>'+
+    table(['ПВЗ','Погружено','Выгружено к выдаче','Операции в буфере','Труд','Компенсация','Себестоимость','Маржа ПВЗ','Скидка продавцам'],[
+      ...e.by_pvz.map(partners),['<strong>Всего</strong>',num(sum('pickup')),num(sum('drop')),num(sum('relay_drop')+sum('relay_pickup')),
+        num(sum('work_minutes'))+' мин',money(sum('pvz_revenue')),money(sum('pvz_cost')),signed(sum('pvz_margin')),money(sum('seller_rebate'))]])+
+    '</details></div></section>';
 }
 
 function fleetTrips(view){
