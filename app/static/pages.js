@@ -58,7 +58,11 @@ function portfolioPage(){
 }
 function demoPage(){
   const idx=s.step??0,count=s.steps.length,done=idx>=count;
+  const workdays=Object.entries(fleetSettings?.scenarios||{}).filter(([,item])=>item.description)
+    .map(([id,item])=>'<div class="scenario-row"><div class="grow"><h3>'+esc(item.title)+'</h3><p>'+esc(item.description)+
+      '</p></div>'+button('fleet-scenario','Настроить и рассчитать','truck',false,'data-id="'+esc(id)+'"')+'</div>');
   return title('Демо-сценарии','Сквозные проверки операций, остатков и начислений',button('map-page','Карта рейсов','map'))+
+    panel('Рабочие дни парка',workdays.length?workdays.join(''):empty('Загружаем рабочие дни…'))+
     panel(scenarios[s.scenario]?.[0]||'Активная смена',pad('<div class="stack"><div class="section-actions">'+chip(prof(s.profile),'accent')+chip(s.fixture_version||'golden-v1')+chip(count?'Шаг '+idx+' из '+count:'Свободная смена')+'</div>'+(count?'<ol class="step-list">'+s.steps.map((x,i)=>'<li class="'+(i<idx?'done':i===idx?'next':'')+'">'+esc(x.label)+(i<idx?' ✓':'')+'</li>').join('')+'</ol><div class="section-actions">'+button('demo-step','Следующий шаг','arrow',true,done?'disabled':'')+button('demo-run','Пройти до конца','play',false,done?'disabled':'')+'</div>':'')+
     (s.replay_check?'<div class="notice">Повторены два скана. Новых движений, начислений и инцидентов: '+[s.replay_check.movements,s.replay_check.ledger,s.replay_check.incidents].join(' / ')+'. Изменение количества: HTTP '+s.replay_check.changed_body_status+'.</div>':'')+dl([['Физический остаток в сети',num(s.totals.network_units)+' шт.'],['Фактические расходы RWB',money(s.totals.rwb_cost)],['Готовы к исходному сроку',num(s.totals.on_time)+' из '+num(s.totals.ready_count)]])+'</div>'))+
     panel('Выбрать сценарий',Object.entries(scenarios).map(([id,[n,desc]],i)=>'<div class="scenario-row '+(s.scenario===id?'active':'')+'"><span class="scenario-id">'+(i<5?'0'+(i+1):icon(i===5?'map':'box',17))+'</span><div class="grow"><h3>'+esc(n)+'</h3><p>'+esc(desc)+'</p></div>'+button('reset','Начать','',false,'data-id="'+id+'"')+'</div>').join(''));

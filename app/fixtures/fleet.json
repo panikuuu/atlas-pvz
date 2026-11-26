@@ -27,7 +27,65 @@
     "K": [600, 1140], "HUB": [480, 1320]
   },
   "relays": { "B": 160, "C": 180 },
+  "products": {
+    "S": {"title":"Книга","seller":"seller-1","liters":2,"kg":0.6,"price":95000,"cost":43000},
+    "KITCHEN": {"title":"Набор посуды","seller":"Дом и кухня","liters":10,"kg":2.4,"price":225000,"cost":151000},
+    "TEXTILE": {"title":"Комплект полотенец","seller":"Текстиль","liters":5,"kg":1.2,"price":119000,"cost":81000},
+    "LAMP": {"title":"Настольная лампа","seller":"Дом и кухня","liters":17,"kg":3.2,"price":259000,"cost":205000},
+    "CASE": {"title":"Чехол для телефона","seller":"Мобильные аксессуары","liters":0.4,"kg":0.12,"price":39000,"cost":24500},
+    "CABLE": {"title":"Кабель USB","seller":"Мобильные аксессуары","liters":0.25,"kg":0.1,"price":25000,"cost":19000}
+  },
+  "contracts": {
+    "original": {"hub_tariff":9200,"rebate":10},
+    "pilot": {"hub_tariff":9200,"rebate":7}
+  },
   "scenarios": {
+    "assortment": {
+      "title": "Городской ассортимент",
+      "description": "Посуда, текстиль и аксессуары для нескольких ПВЗ. Две машины встречаются в Университете, где одна зона погрузки.",
+      "bays": 1,
+      "trucks": [
+        {"id":"М1","start":"F","end":"B","start_min":540,"end_min":690,"liters":155,"kg":65,"planned":true},
+        {"id":"М2","start":"B","end":"K","start_min":620,"end_min":995,"liters":150,"kg":90,"planned":true},
+        {"id":"М3","start":"E","end":"B","start_min":560,"end_min":775,"liters":100,"kg":55,"planned":true}
+      ],
+      "batches": [
+        ["F","A",8,540,660,"KITCHEN"], ["F","B",12,545,705,"TEXTILE"],
+        ["F","K",16,540,995,"CASE"], ["A","B",8,555,695,"CABLE"],
+        ["E","B",8,565,760,"KITCHEN"], ["B","K",10,625,990,"TEXTILE"]
+      ]
+    },
+    "bulky": {
+      "title": "Объёмные товары и сельские ПВЗ",
+      "description": "Лампы и посуда занимают больше места, чем текстиль. Изменение свободных литров меняет набор заказов в машинах.",
+      "bays": 1,
+      "trucks": [
+        {"id":"М1","start":"C","end":"D","start_min":605,"end_min":855,"liters":105,"kg":55,"planned":true},
+        {"id":"М2","start":"C","end":"D","start_min":635,"end_min":870,"liters":110,"kg":60,"planned":true},
+        {"id":"М3","start":"G","end":"D","start_min":665,"end_min":925,"liters":130,"kg":75,"planned":true},
+        {"id":"М4","start":"B","end":"K","start_min":675,"end_min":990,"liters":115,"kg":65,"planned":true}
+      ],
+      "batches": [
+        ["C","D",6,605,800,"LAMP"], ["C","D",8,635,850,"KITCHEN"],
+        ["C","D",10,640,850,"TEXTILE"], ["G","D",7,665,905,"LAMP"],
+        ["B","K",9,675,980,"KITCHEN"], ["B","K",12,690,990,"CASE"]
+      ]
+    },
+    "deadlines": {
+      "title": "Утренние окна и поздняя сборка",
+      "description": "Одинаковые товары готовы в разное время. Срочные отправления и поздняя партия конкурируют за машину и окно ПВЗ.",
+      "bays": 1,
+      "trucks": [
+        {"id":"М1","start":"F","end":"B","start_min":540,"end_min":650,"liters":100,"kg":80,"planned":true},
+        {"id":"М2","start":"B","end":"K","start_min":600,"end_min":825,"liters":110,"kg":60,"planned":true},
+        {"id":"М3","start":"F","end":"A","start_min":655,"end_min":780,"liters":105,"kg":65,"planned":true}
+      ],
+      "batches": [
+        ["F","B",10,540,620,"KITCHEN"], ["F","B",12,665,745,"CABLE"],
+        ["F","K",10,545,825,"TEXTILE"], ["B","K",16,600,770,"CASE"],
+        ["F","A",12,655,765,"TEXTILE"], ["B","K",8,790,800,"LAMP"]
+      ]
+    },
     "network": {
       "title": "Вся сеть · девять ПВЗ",
       "trucks": [

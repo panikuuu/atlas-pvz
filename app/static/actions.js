@@ -103,6 +103,7 @@ async function act(a,el){
   if(a==='zoom-plus'||a==='zoom-minus'){zoomMap(a==='zoom-plus'?1.35:1/1.35);return;}
   const handlers={
     'fleet-page':()=>go('fleet'),'fleet-form':()=>fleetForm(),'fleet-refresh':loadFleet,'fleet-add':()=>changeFleetVehicles(),
+    'fleet-scenario':()=>{go('fleet');fleetForm(id);},'fleet-export':exportFleet,
     'fleet-remove':()=>changeFleetVehicles(Number(id)),
     'fleet-current':()=>{fleetDraft=null;fleetSelected=null;fleetFocus=null;render();},
     'fleet-truck':()=>{fleetSelected=id;fleetFocus=null;moveMap(0,0,1);render();},
@@ -166,9 +167,11 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('change',async e=>{
  const el=e.target;
  if(el.name==='fleet_scenario'){fleetForm(el.value);return;}
+ if(el.name==='fleet_point'){fleetPoint=el.value;render();document.querySelector('[name="fleet_point"]')?.focus({preventScroll:true});return;}
+ if(el.name==='fleet_contract'){el.form.elements.price_rebate.value=fleetSettings.contracts[el.value].rebate;return;}
  if(el.id==='truck-cargo-only'){cargoOnly=el.checked;render();return;}
  if(el.id==='role'){
-    if(busy){el.value=role;return;}role=el.value;localStorage.setItem('atlas-role',role);portfolio=null;ledgerParty='';ledgerLot='';ledgerDay='';ledgerPageNo=0;orderSearch='';activePage=allowedPages[role][0];location.hash=activePage;await refresh();return;
+    if(busy){el.value=role;return;}role=el.value;localStorage.setItem('atlas-role',role);portfolio=null;fleetSettings=null;fleetDraft=null;fleetDay=null;fleetFormState=null;fleetPoint='';fleetSelected=null;ledgerParty='';ledgerLot='';ledgerDay='';ledgerPageNo=0;orderSearch='';activePage=allowedPages[role][0];location.hash=activePage;await refresh();return;
  }
  if(el.id==='demand'||el.id==='consent'){
     if(el.id==='demand')demand=el.value;else consent=Number(el.value);

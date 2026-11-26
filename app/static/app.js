@@ -49,7 +49,7 @@ async function api(path,body){
   if(!r.ok){const d=data.detail||data.message||data.error;const detail=typeof d==='object'?(d.message||d.detail||JSON.stringify(d)):d;throw new Error((r.status===409?'Конфликт версии или остатка. ':'')+(reasons[detail]||detail||r.statusText)+' ('+r.status+')');}
   return data;
 }
-function go(page){if(!allowedPages[role].includes(page))page=allowedPages[role][0];activePage=page;location.hash=page;render();if(page==='portfolio')loadPortfolio().catch(showError);if(page==='fleet')loadFleet().catch(showError)}
+function go(page){if(!allowedPages[role].includes(page))page=allowedPages[role][0];activePage=page;location.hash=page;render();if(page==='portfolio')loadPortfolio().catch(showError);if(page==='fleet'||(page==='demo'&&!fleetSettings))loadFleet().catch(showError)}
 function showError(err){
   const msg=err.message||String(err);if(dialog.open){
     $('#dialog-body .notice.error')?.remove();
@@ -69,7 +69,7 @@ async function refresh(){
     }
     s=state;s.orders??=[];s.lots??=[];s.ledger??=[];s.settings??={};s.points??=[];s.totals??={};s.metrics??={};s.steps??=[];
     $('#connection').textContent='Стенд на связи';$('#connection-dot').classList.add('live');
-    render();if(activePage==='portfolio')await loadPortfolio();if(activePage==='fleet')await loadFleet();
+    render();if(activePage==='portfolio')await loadPortfolio();if(activePage==='fleet'||(activePage==='demo'&&!fleetSettings))await loadFleet();
   }catch(e){if(seq!==loadSequence)return;
     $('#connection').textContent='Нет связи со стендом';$('#connection-dot').classList.remove('live');main.innerHTML=panel('Смена временно недоступна',pad('<div class="stack"><p>'+esc(e.message)+'</p>'+button('refresh','Повторить подключение','refresh')+'</div>'));main.setAttribute('aria-busy','false');}
 }
@@ -100,13 +100,13 @@ function mapPage(){
   const ready=eligibleOrders.length,savings=q?.savings??candidate?.savings;
   const hasManifest=s.dispatches?.some(d=>d.quote_id===q?.quote_id);
   let routeInfo='<div class="panel-body"><div class="route-header">'+icon('route',16)+'Выбранное направление</div><h2 class="route-title">'+esc(loc(src))+' → '+esc(loc(dest))+'</h2><p class="sub">'+(q?esc(q.orders_count??ready)+' зак. в расчёте · '+esc(prof(q.profile||s.profile)):'Подготовьте заказы и рассчитайте рейс')+'</p></div>';
+  routeInfo+='<div class="route-actions">'+(q?button('compare','Сравнить варианты','layers',true):button('quote','Рассчитать рейс','route',true,!ready?'disabled':''))+(q?button('dispatch',hasManifest?'Закреплён':'Закрепить','',false,hasManifest||!eligibleOrders.some(o=>o.status==='ASSEMBLED')||selected==='MANUAL_EXCEPTION'?'disabled':''):'')+'</div>';
   routeInfo+='<div class="route-list">'+candidates.map(c=>'<div class="route-option '+(c.mode===selected?'chosen':'')+'"><div><b>'+esc(modes[c.mode]||c.mode)+'</b><small>'+esc(!c.eligible?(reasons[c.reason]||c.reason||'Недоступен'):c.mode===selected?'Выбран системой':'Альтернатива')+'</small></div><div class="amount"><b>'+money(c.route_cost)+'</b><small>'+(!c.eligible?'недоступно':num(c.ready_hours)+' ч')+'</small></div></div>').join('')+'</div>';
   if(!q)routeInfo+=empty('Для расчёта требуется принятый товар и резерв заказов.');
   if (candidate?.eligible && candidate.lost_tariff_revenue > 0) {
     routeInfo += '<p class="tariff-note">В экономии партии уже учтено снижение выручки RWB на ' +
       money(candidate.lost_tariff_revenue) + ' из-за скидки продавцу.</p>';
   }
-  routeInfo+='<div class="route-actions">'+(q?button('compare','Сравнить варианты','layers',true):button('quote','Рассчитать рейс','route',true,!ready?'disabled':''))+(q?button('dispatch',hasManifest?'Закреплён':'Закрепить','',false,hasManifest||!eligibleOrders.some(o=>o.status==='ASSEMBLED')||selected==='MANUAL_EXCEPTION'?'disabled':''):'')+'</div>';
   const mapHeader='<div class="panel-head"><div class="section-title">'+icon('map',19)+'<h2>Схема сети</h2></div><div class="section-actions">'+
     (s.scenario==='sandbox'?button('direction','Направление','route'):'')+
     button('network-plan','План сети','layers')+button('settings','Условия рейса','filter')+
@@ -118,10 +118,12 @@ function mapPage(){
     '<div class="map-tools">'+[['minus','Уменьшить'],['plus','Увеличить'],['fit','Вся сеть']].map(([a,v])=>'<button data-action="zoom-'+a+'" title="'+v+'" aria-label="'+v+'">'+icon(a,15)+'</button>').join('')+
     '</div></div><div class="map-legend">'+legend.map(([a,v])=>'<span class="legend-item"><i class="legend-stroke '+a+'"></i>'+v+'</span>').join('')+'</div>';
   const dir=pointName(src)+' → '+pointName(dest);
-  return title('Карта рейсов','Учебная агломерация · '+tm(s.now).split(',')[0]+' · Московское время',button('profile',prof(s.profile),'contract'))+
+  const map='<section class="panel">'+mapHeader+mapVisual+'</section>';
+  return title('Карта рейсов','Учебная агломерация · '+tm(s.now).split(',')[0]+' · Московское время',
+    button('fleet-page','Парк машин','truck',true)+button('demo-page','Сценарии','play')+button('profile',prof(s.profile),'contract'))+
     (itinerary?'':stats([['box','Заказов в направлении',num(s.orders.filter(o=>o.source===src&&o.destination===dest).length)],['truck','Свободных попутных мест',num(s.settings.shared_slots)],['target','Индекс рейса, из 100',num(q?.index??candidate?.index)],['trend','Экономия по расчёту',signed(savings)]]))+
-    '<div class="map-grid'+(itinerary?' has-itinerary':'')+'"><section class="panel">'+mapHeader+mapVisual+'</section>'+
-    (itinerary||'<section class="panel route-panel">'+routeInfo+'</section>')+'</div>'+
+    (itinerary?'<div class="map-grid has-itinerary">'+map+itinerary+'</div>':
+      '<div class="map-grid map-overview"><section class="panel route-panel">'+routeInfo+'</section>'+map+'</div>')+
     (itinerary?'':(
     panel('Направления смены',table(['Направление','Заказы к окну','Попутный остаток','Решение','Экономия'],[[linkButton(q?'compare':'settings',src+'-'+dest,dir),esc(ready)+' шт.',esc(num(s.settings.shared_slots))+' мест',chip(modes[selected]||'Ожидает расчёта',q?'accent':''),signed(savings)]]),button('demo-page','Демо-сценарии','play'))+
     panel('Результат по факту',pad(dl([['Вклад RWB',money(t.rwb_contribution)],['Эффект программы против централизованной схемы',signed(t.program_delta)],['Готовы к исходному сроку',num(t.on_time)+' из '+num(t.ready_count)]])))));

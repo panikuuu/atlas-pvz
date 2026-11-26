@@ -1,7 +1,6 @@
 """Costed pickup and delivery across a small fleet and scheduled relay points."""
 
 from collections import Counter
-from itertools import pairwise
 import json
 from math import isfinite
 from pathlib import Path
@@ -48,12 +47,22 @@ def prices_for(changes):
     return prices
 
 
-def demo_batches(scenario):
+def demo_batches(scenario, vehicles=()):
     result={}
-    for i,(source,dest,count,ready,due) in enumerate(scenario["batches"],1):
+    for i,(source,dest,count,ready,due,*sku) in enumerate(scenario["batches"],1):
         oid=f"П-{i:02}"
-        result[oid]={"id":oid,"from":source,"to":dest,"qty":count,"liters":count*2.0,
-                     "kg":count*.6,"ready":ready,"due":due}
+        code=sku[0] if sku else "S"
+        product=FIXTURE["products"][code]
+        orders=[{**product,"sku":code,"id":f"{oid}-{n:02}","due":due,"buyer_delivery":0}
+                for n in range(1,count+1)]
+        capacity=max((int(min((v["liters"]+1e-8)/product["liters"],(v["kg"]+1e-8)/product["kg"]))
+                      for v in vehicles),default=count) if sku else count
+        size=min(count,capacity) if capacity else count
+        for start in range(0,count,size):
+            group=orders[start:start+size]
+            bid=oid if size==count else f"{oid}.{start//size+1}"
+            result[bid]={"id":bid,"from":source,"to":dest,"qty":len(group),"liters":len(group)*product["liters"],
+                         "kg":len(group)*product["kg"],"ready":ready,"due":due,"orders":group}
     return result
 
 
@@ -103,7 +112,31 @@ def work_minutes(qty):
     return 0.25*qty
 
 
-def drive(route, vehicle, batches, arrivals, prices):
+def bay_time(earliest, events, batches, arrivals, reservations):
+    def finish(start):
+        t=start+4
+        for event in events:
+            batch=batches[event["batch"]]
+            if event["kind"]=="pickup":
+                t=max(t,batch["ready"])
+            elif event["kind"]=="relay_pickup":
+                t=max(t,arrivals.get(batch["id"],float("inf"))+TRANSFER_BUFFER)
+            t+=work_minutes(batch["qty"])
+        return t
+
+    candidates=[]
+    for bay,intervals in enumerate(reservations):
+        start=earliest
+        for occupied_from,occupied_to in sorted(intervals):
+            if finish(start)<=occupied_from+1e-8:
+                break
+            start=max(start,occupied_to)
+        candidates.append((finish(start),start,bay))
+    _,start,bay=min(candidates)
+    return start,bay
+
+
+def drive(route, vehicle, batches, arrivals, prices, calendar=None):
     stops=[]
     onboard=set()
     t=vehicle["start_min"]
@@ -120,10 +153,14 @@ def drive(route, vehicle, batches, arrivals, prices):
         opening,closing=FIXTURE["windows"][point]
         t=max(t,opening)
         arrival=t
+        events=sorted(events,key=lambda e:e["kind"] in {"pickup","relay_pickup"})
+        reservations=calendar[point] if calendar is not None else [[]]
+        t,bay=bay_time(t,events,batches,arrivals,reservations)
+        service_from=t
         t+=4
         handling+=4
         details=[]
-        for event in sorted(events,key=lambda e:e["kind"] in {"pickup","relay_pickup"}):
+        for event in events:
             oid=event["batch"]
             batch=batches[oid]
             kind=event["kind"]
@@ -132,7 +169,7 @@ def drive(route, vehicle, batches, arrivals, prices):
                 ready=batch["ready"] if kind=="pickup" else arrivals.get(oid,float("inf"))+TRANSFER_BUFFER
                 t=max(t,ready)+duration
                 onboard.add(oid)
-                if (sum(batches[key]["liters"] for key in onboard)>vehicle["liters"] or
+                if (sum(batches[key]["liters"] for key in onboard)>vehicle["liters"]+1e-8 or
                     sum(batches[key]["kg"] for key in onboard)>vehicle["kg"]+1e-8):
                     return None
             else:
@@ -144,11 +181,13 @@ def drive(route, vehicle, batches, arrivals, prices):
                     received[oid]=t
                 elif t>batch["due"]:
                     return None
-            details.append({**event,"at":t,"qty":batch["qty"]})
+            details.append({**event,"from_min":t-duration,"at":t,"qty":batch["qty"]})
             handling+=duration
         if t>closing or t>vehicle["end_min"]:
             return None
-        stops.append({"point":point,"arrive":arrival,"leave":t,"events":details,
+        reservations[bay].append((service_from,t))
+        stops.append({"point":point,"arrive":arrival,"service_from":service_from,"bay":bay+1,
+                      "leave":t,"events":details,
                       "liters_after":round(sum(batches[key]["liters"] for key in onboard),2),
                       "kg_after":round(sum(batches[key]["kg"] for key in onboard),3)})
     if onboard or t>vehicle["end_min"]:
@@ -165,12 +204,13 @@ def drive(route, vehicle, batches, arrivals, prices):
             "costs":costs,"finish":t}
 
 
-def schedule(routes, vehicles, batches, prices):
+def schedule(routes, vehicles, batches, prices, bays=None):
     arrivals={}
     output=[]
     transfer_events={}
+    calendar={point:[[] for _ in range(bays or len(vehicles))] for point in STATIONS}
     for route,vehicle in zip(routes,vehicles):
-        trip=drive(route,vehicle,batches,arrivals,prices)
+        trip=drive(route,vehicle,batches,arrivals,prices,calendar)
         if trip is None:
             return None
         arrivals.update(trip.pop("received"))
@@ -184,7 +224,7 @@ def schedule(routes, vehicles, batches, prices):
         for event in sorted(events,key=lambda e:(e["at"],e["kind"]!="relay_pickup")):
             volume=batches[event["batch"]]["liters"]
             liters+=volume if event["kind"]=="relay_drop" else -volume
-            if liters>RELAYS[point] or liters < -1e-8:
+            if liters>RELAYS[point]+1e-8 or liters < -1e-8:
                 return None
     return output
 
@@ -216,7 +256,7 @@ def summarize(trips, batches, prices):
             "break_even_per_unit":route_cost/units if units else None}
 
 
-def solve(vehicles,batches,prices,allow_transfer=True,volume_first=False):
+def solve(vehicles,batches,prices,allow_transfer=True,volume_first=False,bays=None):
     def priority(order):
         due,value=order["due"],-estimate_hub(order,prices)
         return (value,due,order["id"]) if volume_first else (due,value,order["id"])
@@ -226,7 +266,7 @@ def solve(vehicles,batches,prices,allow_transfer=True,volume_first=False):
     pairs=[(v,r) for v,r in zip(vehicles,routes) if v["start_min"]+minutes(v["start"],v["end"])<=v["end_min"]]
     vehicles=[v for v,_ in pairs]
     routes=[r for _,r in pairs]
-    trips=schedule(routes,vehicles,batches,prices)
+    trips=schedule(routes,vehicles,batches,prices,bays)
     best_cost=summarize(trips,batches,prices)["total"]
     for o in orders:
         oid,source,dest=o["id"],o["from"],o["to"]
@@ -234,7 +274,7 @@ def solve(vehicles,batches,prices,allow_transfer=True,volume_first=False):
         for i,route in enumerate(routes):
             for updated in inserted(route,action(oid,source,"pickup"),action(oid,dest,"drop")):
                 candidate=routes[:i]+[updated]+routes[i+1:]
-                result=schedule(candidate,vehicles,batches,prices)
+                result=schedule(candidate,vehicles,batches,prices,bays)
                 if result is not None:
                     cost=summarize(result,batches,prices)["total"]
                     if cost<best_cost:
@@ -251,7 +291,7 @@ def solve(vehicles,batches,prices,allow_transfer=True,volume_first=False):
                             for right in inserted(routes[j],action(oid,mid,"relay_pickup"),action(oid,dest,"drop")):
                                 candidate=routes.copy()
                                 candidate[i],candidate[j]=left,right
-                                result=schedule(candidate,vehicles,batches,prices)
+                                result=schedule(candidate,vehicles,batches,prices,bays)
                                 if result is not None:
                                     cost=summarize(result,batches,prices)["total"]
                                     if cost<best_cost:
@@ -334,12 +374,12 @@ def point_breakdown(trips,batches,prices,coordination):
             "work_minutes":work_min,"baseline":row["baseline"],"actual":row["actual"],
             "rwb_effect":row["baseline"]-row["actual"],"seller_rebate":row["rebate"],
             "pvz_revenue":revenue,"pvz_cost":cost,"pvz_margin":revenue-cost})
-    return result
+    return result,batch_cost,served,relayed
 
 
-def plan(vehicles,batches,prices,allow_transfer=True):
+def plan(vehicles,batches,prices,allow_transfer=True,bays=None):
     def best(transfer):
-        return min((solve(vehicles,batches,prices,transfer,volume_first) for volume_first in (False,True)),
+        return min((solve(vehicles,batches,prices,transfer,volume_first,bays) for volume_first in (False,True)),
                    key=lambda variant:variant["economics"]["total"])
     direct=best(False)
     with_relay=best(True) if allow_transfer else direct
@@ -357,9 +397,23 @@ def plan(vehicles,batches,prices,allow_transfer=True):
     if economy["units"]:
         economy["break_even_per_unit"]=(economy["direct_cost"]+day_fee)/economy["units"]
     no_relay=direct["economics"]
-    no_relay_total=min(no_relay["all_hub"],no_relay["total"]+(coordination if no_relay["units"] else 0))
-    # The chosen variant can be the same object as the direct-only variant.
-    if no_relay is economy:
-        no_relay_total=economy["total"]
-    economy["by_pvz"]=point_breakdown(chosen["trucks"],batches,prices,day_fee)
-    return {**chosen,"batches":batches,"prices":prices,"without_relay":no_relay_total}
+    no_relay_total=(economy["total"] if no_relay is economy else
+                    min(no_relay["all_hub"],no_relay["total"]+(coordination if no_relay["units"] else 0)))
+    rows,batch_cost,served,relayed=point_breakdown(chosen["trucks"],batches,prices,day_fee)
+    economy["by_pvz"]=rows
+    visits={oid:[] for oid in batches}
+    for index,trip in enumerate(chosen["trucks"],1):
+        trip["index"]=index
+        for visit in trip["stops"]:
+            for event in visit["events"]:
+                visits[event["batch"]].append({"truck":trip["id"],"index":index,"point":visit["point"],
+                                               "operation":event["kind"],"at":event["at"]})
+    parcel_cost=sum(round(prices[key]*100) for key in ("packing","expected_extra_risk"))
+    transfer_cost=round(prices["transfer_handling"]*100)
+    assigned={}
+    for oid,batch in batches.items():
+        extra=parcel_cost+(transfer_cost if oid in relayed else 0)
+        physical=(batch_cost[oid]+batch["qty"]*extra if oid in served else estimate_hub(batch,prices))
+        assigned[oid]={**batch,"physical_cost":physical,"route":visits[oid]}
+    economy["hub_remaining"]=[assigned[batch["id"]] for batch in economy["hub_remaining"]]
+    return {**chosen,"batches":assigned,"prices":prices,"without_relay":no_relay_total}
