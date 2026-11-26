@@ -9,6 +9,18 @@ function selectField(label,name,opts,current){
 function form(id,html,submit='Подтвердить'){
   return '<form id="'+id+'">'+html+'<div class="dialog-actions">'+button('dismiss','Отмена')+'<button class="btn primary">'+esc(submit)+'</button></div></form>';
 }
+function restrictDestination(form,source){
+  const select=form.elements.destination||form.elements.pvz_id;
+  for(const option of select.options)option.disabled=option.value===source;
+  if(select.selectedOptions[0]?.disabled)select.value=[...select.options].find(o=>!o.disabled)?.value||'';
+}
+function directionForm(){
+  const points=pickupOptions();
+  dialogBox('Рабочее направление',form('direction-form','<div class="fields">'+
+    selectField('ПВЗ отправления','source',points,s.settings.source)+
+    selectField('ПВЗ выдачи','destination',points,s.settings.destination)+'</div>','Открыть окно'));
+  restrictDestination($('#direction-form'),s.settings.source);
+}
 function compare(){
   const q=s.quote;if(!q){toast('Сначала рассчитайте предложение для открытых заказов.');return;}
   const references=[['Момент фиксации',tm(q.fixed_at)],['Исходные данные',q.scenario_version],['Версия тарифа',q.tariff_version],['База через хаб для всей партии',money(q.hub_reference_cost)],['Экономия относительно хаба из локального запаса',signed(q.savings)],['Индекс экономии',q.index==null?'Нет оценки':num(q.index)+' из 100']];
@@ -28,7 +40,10 @@ function settingsForm(){
   const orders=s.orders.filter(o=>['ASSEMBLED','RESERVED'].includes(o.status)&&o.source===src&&o.destination===dest);
   const count=q?.order_ids?.length??orders.length;
   dialogBox('Условия рейса',form('conditions','<div class="stack"><div class="notice">'+esc(loc(src)+' → '+loc(dest))+' · '+esc(s.window_id)+'</div><div class="fields">'+field('Заказов в расчёте','count','number',Math.min(count,orders.length),'required step="1" min="'+(orders.length?1:0)+'" max="'+orders.length+'"')+field('Попутные места','shared_slots','number',cfg.shared_slots,'min="0" step="1"')+field('Попутный объём, л','shared_liters','number',cfg.shared_liters,'min="0" step="any"')+field('Попутный груз, г','shared_grams','number',cfg.shared_grams,'min="0" step="1"')+
-  field('Готовность попутным рейсом, ч','shared_ready_hours','number',cfg.shared_ready_hours,'min="0" step="any"')+field('Готовность отдельным рейсом, ч','dedicated_ready_hours','number',cfg.dedicated_ready_hours,'min="0" step="any"')+field('Готовность через хаб, ч','hub_ready_hours','number',cfg.hub_ready_hours,'min="0" step="any"')+field('Доступно на сборку, мин','origin_minutes','number',cfg.origin_minutes,'min="0" step="any"')+field('Доступно в точке выдачи, мин','destination_minutes','number',cfg.destination_minutes,'min="0" step="any"')+field('Свободно в точке выдачи, л','destination_liters','number',cfg.destination_liters,'min="0" step="any"')+'</div><details><summary>Расписание и часы работы</summary><div class="fields">'+['shared','dedicated','hub'].map((k,i)=>[['departure_at','Выезд'],['handoff_at','Сдать до']].map(([suffix,label])=>field(label+' · '+['попутный','отдельный','хаб'][i]+', мск',k+'_'+suffix,'datetime-local',cfg[k+'_'+suffix]?isoField(cfg[k+'_'+suffix]):'')).join('')).join('')+field('Закрытие ПВЗ выдачи, мск','destination_close_at','datetime-local',cfg.destination_close_at?isoField(cfg.destination_close_at):'')+'</div><p class="micro">Для фиксированного рейса задайте выезд и время передачи. Время готовности включает ожидание этого выезда.</p></details><p class="micro">Ноль мест закрывает попутный рейс. Пустое поле означает отсутствие данных. Первыми распределяются заказы с ближайшим обещанным сроком.</p></div>','Пересчитать'));
+  field('Готовность попутным рейсом, ч','shared_ready_hours','number',cfg.shared_ready_hours,'min="0" step="any"')+field('Готовность отдельным рейсом, ч','dedicated_ready_hours','number',cfg.dedicated_ready_hours,'min="0" step="any"')+field('Готовность через хаб, ч','hub_ready_hours','number',cfg.hub_ready_hours,'min="0" step="any"')+field('Доступно на сборку, мин','origin_minutes','number',cfg.origin_minutes,'min="0" step="any"')+field('Доступно в точке выдачи, мин','destination_minutes','number',cfg.destination_minutes,'min="0" step="any"')+field('Свободно в точке выдачи, л','destination_liters','number',cfg.destination_liters,'min="0" step="any"')+'</div><details><summary>Расписание и часы работы</summary><div class="fields">'+
+  field('Дополнительный пробег попутного рейса, км','detour_km','number',cfg.detour_km,'min="0" step="any"')+
+  field('Дополнительное время попутного рейса, мин','detour_minutes','number',cfg.detour_minutes,'min="0" step="any"')+
+  ['shared','dedicated','hub'].map((k,i)=>[['departure_at','Выезд'],['handoff_at','Сдать до']].map(([suffix,label])=>field(label+' · '+['попутный','отдельный','хаб'][i]+', мск',k+'_'+suffix,'datetime-local',cfg[k+'_'+suffix]?isoField(cfg[k+'_'+suffix]):'')).join('')).join('')+field('Закрытие ПВЗ выдачи, мск','destination_close_at','datetime-local',cfg.destination_close_at?isoField(cfg.destination_close_at):'')+'</div><p class="micro">Для фиксированного рейса задайте выезд и время передачи. Время готовности включает ожидание этого выезда.</p></details><p class="micro">Ноль мест закрывает попутный рейс. Пустое поле означает отсутствие данных. Первыми распределяются заказы с ближайшим обещанным сроком.</p></div>','Пересчитать'));
 }
 function profileForm(){
   const body='<div class="stack">'+table(['Договор','Сборка ПВЗ','Прямой тариф продавцу','Через хаб'],[['Пилотный','12 ₽','85 ₽','92 ₽'],['Исходный','16 ₽','82 ₽','92 ₽']])+
@@ -38,7 +53,7 @@ function profileForm(){
 function receiptForm(){
   const promptId='LOT-'+String(s.lots.length+1).padStart(3,'0');
   dialogBox('Приёмка партии',form('receipt-form','<div class="fields">'+field('Номер партии','lot_id','text',promptId,'required maxlength="100"')+field('Штрихкод','barcode','text','S','required')+
-    selectField('ПВЗ приёмки','pvz_id',['A','B','C','D'].map(k=>[k,pointName(k)]),s.settings.source)+selectField('SKU','sku_id',[['S','S · компактная упаковка'],['M','M · средняя упаковка']],'S')+field('Количество','quantity','number',1,'min="1" step="1" required')+field('Масса единицы, г','mass_g','number',600,'min="1" required')+['Длина','Ширина','Высота'].map((name,i)=>field(name+' единицы, мм','dim'+i,'number',[250,160,50][i],'min="1" required')).join('')+field('Разрешённое хранение, сут.','storage_days','number',30,'min="1" required')+'</div><p id="receipt-preview" class="notes spaced"></p>','Подтвердить приёмку'));
+    selectField('ПВЗ приёмки','pvz_id',pickupOptions(),s.settings.source)+selectField('SKU','sku_id',[['S','S · компактная упаковка'],['M','M · средняя упаковка']],'S')+field('Количество','quantity','number',1,'min="1" step="1" required')+field('Масса единицы, г','mass_g','number',600,'min="1" required')+['Длина','Ширина','Высота'].map((name,i)=>field(name+' единицы, мм','dim'+i,'number',[250,160,50][i],'min="1" required')).join('')+field('Разрешённое хранение, сут.','storage_days','number',30,'min="1" required')+'</div><p id="receipt-preview" class="notes spaced"></p>','Подтвердить приёмку'));
   receiptPreview();
 }
 function receiptPreview(){
@@ -48,9 +63,21 @@ function receiptPreview(){
 function newOrder(){
   const lots=s.lots.filter(l=>l.available>0);
   if(!lots.length){dialogBox('Создание заказа',empty('Свободных единиц нет. Примите партию в разделе «Склад и смена» под ролью сотрудника ПВЗ.'));return;}
-  const orig=isoField(+new Date(s.now)+(s.settings.destination==='D'?48:24)*3600000);
-  dialogBox('Тестовый заказ',form('order-form','<div class="fields">'+selectField('Партия','lot_id',lots.map(l=>[l.id,l.id+' · '+loc(l.pvz_id)+' · '+l.available+' шт.']),lots[0].id)+selectField('ПВЗ выдачи','pvz_id',s.points.map(p=>p.id).map(k=>[k,pointName(k)]),s.settings.destination)+field('Исходный срок, мск','promised_at','datetime-local',orig,'required')+
-    '<label>Цена доставки покупателю<input value="0 ₽" readonly></label><label class="checkbox wide"><input type="checkbox" name="consent">Покупатель выбрал дополнительное окно</label><label class="wide" id="chosen-label" hidden>Выбранный срок, мск<input type="datetime-local" name="selected_promised_at" value="'+isoField(+new Date(orig+'+03:00')+86400000)+'" disabled></label></div><p class="notes spaced">Будет зарезервирована одна единица из выбранной партии.</p>','Зарезервировать единицу'));
+  dialogBox('Тестовый заказ',form('order-form','<div class="fields">'+selectField('Партия','lot_id',lots.map(l=>[l.id,l.id+' · '+loc(l.pvz_id)+' · '+l.available+' шт.']),lots[0].id)+selectField('ПВЗ выдачи','pvz_id',pickupOptions(),s.settings.destination)+field('Исходный срок, мск','promised_at','datetime-local','','required')+
+    '<label>Цена доставки покупателю<input value="0 ₽" readonly></label><label class="checkbox wide"><input type="checkbox" name="consent">Покупатель выбрал дополнительное окно</label><label class="wide" id="chosen-label" hidden>Выбранный срок, мск<input type="datetime-local" name="selected_promised_at" disabled></label></div><p class="notes spaced">Будет зарезервирована одна единица из выбранной партии.</p>','Зарезервировать единицу'));
+  setOrderDestination($('#order-form'));
+}
+function setOrderDestination(form){
+  const fields=form.elements;
+  const source=s.lots.find(l=>l.id===fields.lot_id.value).pvz_id;
+  restrictDestination(form,source);
+  const rural=[source,fields.pvz_id.value].some(id=>stations[id]?.area!=='Город');
+  const ready=Date.parse(s.now)+(rural?48:24)*3600000;
+  for(const [field,value] of [[fields.promised_at,isoField(ready)],[fields.selected_promised_at,isoField(ready+86400000)]]){
+    const keep=field.value!==field.defaultValue;
+    field.defaultValue=value;
+    if(!keep)field.value=value;
+  }
 }
 function lotDetails(id){
   const l=s.lots.find(l=>l.id===id);if(!l)return;
@@ -103,7 +130,7 @@ async function act(a,el){
   if(a==='zoom-plus'||a==='zoom-minus'){zoomMap(a==='zoom-plus'?1.35:1/1.35);return;}
   const handlers={
     'fleet-page':()=>go('fleet'),'fleet-form':()=>fleetForm(),'fleet-refresh':loadFleet,'fleet-add':()=>changeFleetVehicles(),
-    'fleet-scenario':()=>{go('fleet');fleetForm(id);},'fleet-export':exportFleet,
+    'fleet-scenario':async()=>{if(!fleetSettings)await loadFleet();go('fleet');fleetForm(id);},'fleet-export':exportFleet,
     'fleet-remove':()=>changeFleetVehicles(Number(id)),
     'fleet-current':()=>{fleetDraft=null;fleetSelected=null;fleetFocus=null;render();},
     'fleet-truck':()=>{fleetSelected=id;fleetFocus=null;moveMap(0,0,1);render();},
@@ -112,8 +139,9 @@ async function act(a,el){
       '<p>Подтверждение сохраняет маршруты и закрепляет заказы рабочей смены за машинами.</p>','Подтвердить план')),
     'fleet-start':()=>fleetCommand('start'),'fleet-next':()=>fleetCommand('next'),
     'fleet-scan':()=>fleetCommand('scan',{batch:id,operation:kind}),
-    direction:()=>dialogBox('Рабочее направление',form('direction-form',selectField('Рейс','lane',['AB','BA','CD','DC','AC'].map(p=>[p,loc(p[0])+' → '+loc(p[1])]),s.settings.source+s.settings.destination),'Открыть окно')),
-    'network-plan':openPlan,'plan-edge':()=>planEdge(id),
+    direction:directionForm,
+    'open-direction':()=>{const [source,destination]=id.split('-');return change('direction',{source,destination},'Выбрано окно направления.');},
+    'network-plan':openPlan,'portfolio-plan':openPortfolioPlan,'plan-edge':()=>planEdge(id),
     'truck-form':truckForm,'truck-export':exportTruck,'truck-confirm':confirmTruck,
     'truck-start':()=>truckCommand('start'),
     'truck-cancel':()=>dialogBox('Отменить рейс',form('truck-cancel-form',
@@ -139,6 +167,7 @@ async function act(a,el){
     },
     dismiss:()=>dialog.close(),refresh,compare,settings:settingsForm,profile:profileForm,receipt:receiptForm,'new-order':newOrder,
     'stock-lots':()=>{stockTab='lots';render()},'stock-moves':()=>{stockTab='moves';render()},
+    'point-stock':()=>pointDetails(id),
     'ledger-prev':()=>{ledgerPageNo--;render()},'ledger-next':()=>{ledgerPageNo++;render()},
     'demo-page':()=>go('demo'),'map-page':()=>go('map'),'lot-detail':()=>lotDetails(id),'order-detail':()=>orderDetails(id),
     'order-event':()=>previewEvent(id,kind,false),'lot-event':()=>previewEvent(id,kind,true),reset:()=>selectReset(id),download,
@@ -166,6 +195,8 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('change',async e=>{
  const el=e.target;
+ if(el.form?.id==='direction-form'&&el.name==='source'){restrictDestination(el.form,el.value);return;}
+ if(el.form?.id==='order-form'&&['lot_id','pvz_id'].includes(el.name)){setOrderDestination(el.form);return;}
  if(el.name==='fleet_scenario'){fleetForm(el.value);return;}
  if(el.name==='fleet_point'){fleetPoint=el.value;render();document.querySelector('[name="fleet_point"]')?.focus({preventScroll:true});return;}
  if(el.name==='fleet_contract'){el.form.elements.price_rebate.value=fleetSettings.contracts[el.value].rebate;return;}
@@ -193,8 +224,8 @@ document.addEventListener('submit',e=>{
   e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f));
   locked(async()=>{
     switch(f.id){
-      case 'direction-form':await change('direction',{source:d.lane[0],destination:d.lane[1]},'Выбрано окно направления.');break;
-      case 'plan-filter':slice=d;await openPlan();break;
+      case 'direction-form':await change('direction',{source:d.source,destination:d.destination},'Выбрано окно направления.');break;
+      case 'plan-filter':slice=d;await openPortfolioPlan();break;
       case 'truck-form':calculateTruck(d);break;
       case 'fleet-plan-form':await calculateFleet();break;
       case 'fleet-confirm-form':await fleetCommand('confirm');break;

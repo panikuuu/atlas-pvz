@@ -13,6 +13,7 @@ import desk
 import fleet
 import fleet_contracts
 import operations as ops
+import pickup_points
 import server
 from commands import once, signature
 from common import Problem
@@ -271,6 +272,8 @@ def advance(db,day,body):
 
 
 def protected(db,path,body,role):
+    if path=="/api/direction":
+        return pickup_points.change_direction(db,body)
     if path in {"/api/events","/api/demo/run","/api/demo/step","/api/truck"}:
         init(db)
         day=load_day(db)
@@ -369,4 +372,5 @@ class FleetHandler(TruckHandler):
             desk.REQUEST_ID.reset(token)
 
 
+pickup_points.connect_shift()
 server.apply_command=protected

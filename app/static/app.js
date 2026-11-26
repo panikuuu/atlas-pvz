@@ -36,6 +36,7 @@ const stat=(symbol,label,value)=>'<div class="stat"><span class="stat-symbol">'+
 const stats=cards=>'<div class="stats">'+cards.map(a=>stat(...a)).join('')+'</div>';
 const linkButton=(act,id,v)=>'<button type="button" class="table-link" data-action="'+esc(act)+'" data-id="'+esc(id)+'">'+esc(v)+'</button>';
 const pointName=id=>stations[id]?stations[id].letter+' · '+stations[id].title:id||'—';
+const pickupOptions=()=>s.points.map(({id})=>[id,pointName(id)]);
 function toast(v){clearTimeout(toastTimer);$('#toast').textContent=v;toastTimer=setTimeout(()=>$('#toast').textContent='',5000)}
 function dialogBox(label,body){
   $('#dialog-body').innerHTML='<div class="panel-head"><h2 id="dialog-title">'+esc(label)+'</h2><button class="plain" data-action="dismiss" aria-label="Закрыть">'+icon('close')+'</button></div><div class="panel-body">'+body+'</div>';
@@ -114,10 +115,22 @@ function mapPage(){
     button('truck-form','Спланировать рейс','truck',true)+'</div></div>';
   const legend=mapPlan?[['truck','Маршрут'],['stop','Номер остановки'],...(mapPlan.focus>0?[['focus-segment','Выбранный участок']]:[])]:
     [['','Прямой рейс'],['dashed','Через хаб'],['gray','Вне выбранного рейса']];
-  const mapVisual='<div class="map-wrap">'+networkMap(src,dest,selected,mapPlan)+
+  const directions=new Map();
+  for(const order of s.orders){
+    if(!['RESERVED','ASSEMBLED'].includes(order.status)||(order.source===src&&order.destination===dest))continue;
+    const lane=order.source+'-'+order.destination;
+    directions.set(lane,(directions.get(lane)||0)+1);
+  }
+  const otherLanes=[...directions.keys()].map(lane=>lane.split('-'));
+  const mapVisual='<div class="map-wrap">'+networkMap(src,dest,selected,mapPlan,otherLanes)+
     '<div class="map-tools">'+[['minus','Уменьшить'],['plus','Увеличить'],['fit','Вся сеть']].map(([a,v])=>'<button data-action="zoom-'+a+'" title="'+v+'" aria-label="'+v+'">'+icon(a,15)+'</button>').join('')+
     '</div></div><div class="map-legend">'+legend.map(([a,v])=>'<span class="legend-item"><i class="legend-stroke '+a+'"></i>'+v+'</span>').join('')+'</div>';
   const dir=pointName(src)+' → '+pointName(dest);
+  const otherRows=[...directions].sort(([a],[b])=>a.localeCompare(b)).map(([lane,count])=>{
+    const [source,destination]=lane.split('-');
+    const name=pointName(source)+' → '+pointName(destination);
+    return [s.scenario==='sandbox'?linkButton('open-direction',lane,name):esc(name),num(count)+' шт.','—','Ожидает расчёта','—'];
+  });
   const map='<section class="panel">'+mapHeader+mapVisual+'</section>';
   return title('Карта рейсов','Учебная агломерация · '+tm(s.now).split(',')[0]+' · Московское время',
     button('fleet-page','Парк машин','truck',true)+button('demo-page','Сценарии','play')+button('profile',prof(s.profile),'contract'))+
@@ -125,7 +138,7 @@ function mapPage(){
     (itinerary?'<div class="map-grid has-itinerary">'+map+itinerary+'</div>':
       '<div class="map-grid map-overview"><section class="panel route-panel">'+routeInfo+'</section>'+map+'</div>')+
     (itinerary?'':(
-    panel('Направления смены',table(['Направление','Заказы к окну','Попутный остаток','Решение','Экономия'],[[linkButton(q?'compare':'settings',src+'-'+dest,dir),esc(ready)+' шт.',esc(num(s.settings.shared_slots))+' мест',chip(modes[selected]||'Ожидает расчёта',q?'accent':''),signed(savings)]]),button('demo-page','Демо-сценарии','play'))+
+    panel('Направления смены',table(['Направление','Заказы к окну','Попутный остаток','Решение','Экономия'],[[linkButton(q?'compare':'settings',src+'-'+dest,dir),esc(ready)+' шт.',esc(num(s.settings.shared_slots))+' мест',chip(modes[selected]||'Ожидает расчёта',q?'accent':''),signed(savings)],...otherRows]),button('demo-page','Демо-сценарии','play'))+
     panel('Результат по факту',pad(dl([['Вклад RWB',money(t.rwb_contribution)],['Эффект программы против централизованной схемы',signed(t.program_delta)],['Готовы к исходному сроку',num(t.on_time)+' из '+num(t.ready_count)]])))));
 }
 window.addEventListener('hashchange',()=>{const p=location.hash.slice(1);if(p!==activePage&&allowedPages[role].includes(p))go(p)});

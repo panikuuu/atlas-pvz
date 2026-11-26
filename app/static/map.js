@@ -130,7 +130,7 @@ function mapTerrain(){
     '<g class="map-district"><text x="25" y="38">ГОРОДСКОЙ ОКРУГ</text><text x="624" y="480">СЕЛЬСКИЙ РАЙОН</text></g>';
   return terrain;
 }
-function networkMap(source,destination,mode,plan=null){
+function networkMap(source,destination,mode,plan=null,otherLanes=[]){
   if(plan?.stops.length){
     const edges=plan.legs.flatMap(leg=>leg.edges);
     const color='#087366';
@@ -152,7 +152,7 @@ function networkMap(source,destination,mode,plan=null){
   const chosen=via?hub:direct;
   const midpoint=along(chosen,.50);
   const color=via?'#946624':active?'#b72d32':'#84918c';
-  const inactive=[['A','B'],['C','D']].filter(([a,b])=>!(a===source && b===destination || b===source && a===destination))
+  const inactive=otherLanes.filter(([a,b])=>!(b===source && a===destination))
     .map(([a,b])=>routeStroke(roadRoute(a,b),'#8b9898',2,true)).join('');
   const layers=via?routeStroke(direct,'#84918c',3,true)+routeStroke(hub,color,4,true):
     routeStroke(hub,'#a78d66',3,true)+routeStroke(direct,color,4,!active);

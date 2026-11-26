@@ -223,6 +223,44 @@ function exportTruck(){
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function openPlan(){
+  const {plan}=await api('fleet',{action:'plan',scenario:'network',contract:s.profile});
+  const lanes=new Map();
+  for(const batch of Object.values(plan.batches)){
+    const key=batch.from+batch.to;
+    if(!lanes.has(key))lanes.set(key,{source:batch.from,destination:batch.to,orders:0,direct:0,hub:0,transfer:0,batches:[]});
+    const lane=lanes.get(key);
+    lane.orders+=batch.qty;
+    if(batch.route.length){
+      lane.direct+=batch.qty;
+      if(batch.route.some(leg=>leg.operation==='relay_drop'))lane.transfer+=batch.qty;
+    }else lane.hub+=batch.qty;
+    lane.batches.push(batch);
+  }
+  const edges=[...lanes.values()];
+  visiblePlan={kind:'fleet',edges,date:plan.date};
+  const routes=edges.map((edge,id)=>{
+    const batch=edge.batches.find(b=>b.route.length);
+    const points=batch?[...new Set(batch.route.map(leg=>leg.point))]:[];
+    const path=points.length?points.slice(1).flatMap((point,i)=>routeEdges(points[i],point,false)):
+      routeEdges(edge.source,edge.destination,true);
+    return planRoute(edge,id,path);
+  }).join('');
+  const rows=edges.map((edge,id)=>[linkButton('plan-edge',id,loc(edge.source)+' → '+loc(edge.destination)),
+    num(edge.orders),num(edge.direct),num(edge.transfer),num(edge.hub)]);
+  dialogBox('План сети · девять ПВЗ','<div class="stack"><div class="section-actions">'+
+    button('fleet-scenario','Настроить парк','truck',true,'data-id="network"')+
+    button('portfolio-plan','Портфель на 28 дней','layers')+'</div>'+
+    '<svg viewBox="0 0 1040 510" aria-label="Маршруты рабочего дня">'+mapTerrain()+routes+pointMarkers([],false)+'</svg>'+
+    '<p class="micro">Красный — доставка парком, пунктир — через хаб. Передачи между машинами входят в заказы парка.</p>'+
+    table(['Направление','Заказы','Через парк','С передачей','Через хаб'],rows)+'</div>');
+}
+function planRoute(edge,index,path){
+  const hub=edge.direct===0,color=hub?'#946624':'#b72d32';
+  return '<g data-action="plan-edge" data-id="'+index+'" role="button" tabindex="0" aria-label="'+
+    esc(loc(edge.source)+' → '+loc(edge.destination))+'">'+routeStroke(path,color,Math.min(6,2+edge.orders/6),hub)+
+    arrow(along(path,.4),color)+'</g>';
+}
+async function openPortfolioPlan(){
   const response=await api('map?'+new URLSearchParams({view:'plan',...slice}));
   visiblePlan=response;
   const opts=(name,label,choices)=>selectField(label,name,choices,slice[name]);
@@ -231,23 +269,26 @@ async function openPlan(){
     opts('demand','Спрос',[['low','Низкий'],['neutral','Нейтральный'],['high','Высокий']])+
     opts('window','Окно',[['day','Основное'],['late','Добровольно выбранное позднее']])+
     opts('consent','Согласны на перенос',['0','5','15','30'].map(i=>[i,i+'%']));
-  const routes=response.edges.map((edge,index)=>{
-    const hub=edge.direct===0;
-    const edges=routeEdges(edge.source,edge.destination,hub);
-    const color=hub?'#946624':'#b72d32';
-    const width=Math.min(6,2+edge.orders/6);
-    const target=along(edges,.4);
-    return '<g data-action="plan-edge" data-id="'+index+'" role="button" tabindex="0" aria-label="'+esc(loc(edge.source)+' → '+loc(edge.destination))+'">'+routeStroke(edges,color,width,hub)+arrow(target,color)+'</g>';
-  }).join('');
+  const routes=response.edges.map((edge,index)=>planRoute(edge,index,routeEdges(edge.source,edge.destination,edge.direct===0))).join('');
   const points=pointMarkers([],false);
   const rows=response.edges.map((e,i)=>[linkButton('plan-edge',i,loc(e.source)+' → '+loc(e.destination)),num(e.orders),num(e.direct)+' / '+num(e.hub),signed(e.savings)]);
-  dialogBox('План сети по окнам','<div class="stack"><div class="notice">'+esc(prof(response.profile))+' · 28 дней · синтетический спрос из книги</div>'+form('plan-filter','<div class="fields">'+inputs+'</div>','Показать срез')+
+  dialogBox('План портфеля по окнам','<div class="stack"><div class="section-actions">'+button('network-plan','Все девять ПВЗ','map')+'</div>'+
+    '<div class="notice">'+esc(prof(response.profile))+' · 28 дней · направления из исходной книги</div>'+form('plan-filter','<div class="fields">'+inputs+'</div>','Показать срез')+
     '<svg viewBox="0 0 1040 510" aria-label="Направления выбранного среза">'+mapTerrain()+routes+points+'</svg><p class="micro">Красный — есть прямые отправления, пунктир — хаб. Толщина линии показывает число заказов. Нажмите на направление для расчёта.</p>'+
     table(['Направление','Заказы','Прямо / хаб','Эффект маршрутизации'],rows)+'</div>');
 }
 function planEdge(id){
   const e=visiblePlan?.edges[Number(id)];
   if(!e)return;
-  dialogBox(loc(e.source)+' → '+loc(e.destination),'<div class="stack">'+dl([['Дата среза',visiblePlan.date],['SKU',e.sku],['Выбор',modes[e.mode]],['Попутная / отдельная / хаб',e.shared+' / '+e.dedicated+' / '+e.hub],['Загрузка попутного места',e.shared+' / '+e.shared_slots],['База через хаб для локального запаса',money(e.hub_reference)],['Экономия рейса',signed(e.savings)],['Индекс',e.index==null?'Нет оценки':num(e.index)+' из 100'],['Эффект размещения до координации',signed(e.expected_program_delta)]])+button('network-plan','К выбранному срезу','map')+'</div>');
+  const title=loc(e.source)+' → '+loc(e.destination);
+  if(visiblePlan.kind==='fleet'){
+    const rows=e.batches.map(b=>[esc(b.id),num(b.qty),b.route.length?
+      esc([...new Set(b.route.map(leg=>'№ '+leg.index+' '+leg.truck))].join(' → ')):'Через хаб',
+      esc(b.route.filter(leg=>leg.operation==='relay_drop').map(leg=>loc(leg.point)).join(', '))||'—']);
+    dialogBox(title,'<div class="stack">'+table(['Партия','Заказы','Машины','ПВЗ передачи'],rows)+
+      button('network-plan','К плану сети','map')+'</div>');
+    return;
+  }
+  dialogBox(title,'<div class="stack">'+dl([['Дата среза',visiblePlan.date],['SKU',e.sku],['Выбор',modes[e.mode]],['Попутная / отдельная / хаб',e.shared+' / '+e.dedicated+' / '+e.hub],['Загрузка попутного места',e.shared+' / '+e.shared_slots],['База через хаб для локального запаса',money(e.hub_reference)],['Экономия рейса',signed(e.savings)],['Индекс',e.index==null?'Нет оценки':num(e.index)+' из 100'],['Эффект размещения до координации',signed(e.expected_program_delta)]])+button('portfolio-plan','К выбранному срезу','map')+'</div>');
 }
 

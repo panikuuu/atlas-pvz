@@ -249,10 +249,7 @@
           {
             "in": "query",
             "name": "pvz_id",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            }
+            "schema": {"$ref": "#/components/schemas/PickupPoint"}
           },
           {
             "in": "query",
@@ -367,10 +364,7 @@
           {
             "in": "query",
             "name": "pvz_id",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            }
+            "schema": {"$ref": "#/components/schemas/PickupPoint"}
           },
           {
             "in": "query",
@@ -1254,6 +1248,7 @@
   },
   "components": {
     "schemas": {
+      "PickupPoint": {"type":"string","enum":["A","B","C","D","E","F","G","J","K"]},
       "Error": {
         "type": "object",
         "properties": {
@@ -1288,15 +1283,7 @@
             "type": "string",
             "minLength": 1
           },
-          "pvz_id": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ]
-          },
+          "pvz_id": {"$ref": "#/components/schemas/PickupPoint"},
           "quantity": {
             "type": "integer",
             "minimum": 1,
@@ -1359,15 +1346,7 @@
             "type": "string",
             "minLength": 1
           },
-          "pvz_id": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ]
-          },
+          "pvz_id": {"$ref": "#/components/schemas/PickupPoint"},
           "quantity": {
             "enum": [
               1
@@ -1498,15 +1477,7 @@
             "type": "string",
             "minLength": 1
           },
-          "pvz_id": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ]
-          },
+          "pvz_id": {"$ref": "#/components/schemas/PickupPoint"},
           "occurred_at": {
             "type": "string",
             "format": "date-time"
@@ -1652,24 +1623,8 @@
             "type": "string",
             "minLength": 1
           },
-          "source": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ]
-          },
-          "destination": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ]
-          },
+          "source": {"$ref": "#/components/schemas/PickupPoint"},
+          "destination": {"$ref": "#/components/schemas/PickupPoint"},
           "version": {
             "type": "integer",
             "minimum": 1
@@ -1704,15 +1659,7 @@
           "available": {
             "type": "integer"
           },
-          "pvz_id": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ]
-          },
+          "pvz_id": {"$ref": "#/components/schemas/PickupPoint"},
           "version": {
             "type": "integer",
             "minimum": 1
@@ -1994,24 +1941,8 @@
         ],
         "additionalProperties": false,
         "properties": {
-          "source": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ]
-          },
-          "destination": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D"
-            ]
-          }
+          "source": {"$ref": "#/components/schemas/PickupPoint"},
+          "destination": {"$ref": "#/components/schemas/PickupPoint"}
         }
       },
       "ReceiptResult": {
