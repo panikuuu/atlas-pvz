@@ -104,13 +104,23 @@ async function act(a,el){
   const handlers={
     direction:()=>dialogBox('Рабочее направление',form('direction-form',selectField('Рейс','lane',['AB','BA','CD','DC','AC'].map(p=>[p,loc(p[0])+' → '+loc(p[1])]),s.settings.source+s.settings.destination),'Открыть окно')),
     'network-plan':openPlan,'plan-edge':()=>planEdge(id),
-    'truck-form':truckForm,'truck-export':exportTruck,
-    'truck-clear':()=>{truckPlan=null;moveMap(0,0,1);render();},
+    'truck-form':truckForm,'truck-export':exportTruck,'truck-confirm':confirmTruck,
+    'truck-start':()=>truckCommand('start'),
+    'truck-cancel':()=>dialogBox('Отменить рейс',form('truck-cancel-form',
+      '<p>Закреплённые заказы вернутся в список собранных.</p>','Освободить заказы')),
+    'truck-open':()=>{showTruck=true;truckPlan=null;moveMap(0,0,1);render();},
+    'truck-clear':()=>{showTruck=false;truckPlan=null;focusedTruckStop=null;moveMap(0,0,1);render();},
+    'truck-scan':()=>truckCommand('scan',{order_id:id,kind}),
+    'truck-review-stop':reviewTruckStop,
+    'truck-delay':()=>dialogBox('Задержка рейса',form('truck-delay-form',
+      field('Длительность, мин','minutes','number',30,'required min="1" max="1440" step="1"'),'Пересчитать время')),
     'truck-stop':()=>{
-      const stop=truckPlan?.stops[Number(id)],point=stations[stop?.id];
+      focusedTruckStop=Number(id);
+      const stop=(showTruck?activeTruck:truckPlan)?.stops[focusedTruckStop],point=stations[stop?.id];
       if(!point)return;
       const scale=Math.max(2.2,mapCamera.scale);
       moveMap(point.x-mapWidth/scale/2,point.y-mapHeight/scale/2,scale);
+      render();
       document.querySelector('#city-map')?.scrollIntoView({block:'nearest'});
     },
     'decision':async()=>{
@@ -146,6 +156,7 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('change',async e=>{
  const el=e.target;
+ if(el.id==='truck-cargo-only'){cargoOnly=el.checked;render();return;}
  if(el.id==='role'){
     if(busy){el.value=role;return;}role=el.value;localStorage.setItem('atlas-role',role);portfolio=null;ledgerParty='';ledgerLot='';ledgerDay='';ledgerPageNo=0;orderSearch='';activePage=allowedPages[role][0];location.hash=activePage;await refresh();return;
  }
@@ -172,8 +183,18 @@ document.addEventListener('submit',e=>{
       case 'direction-form':await change('direction',{source:d.lane[0],destination:d.lane[1]},'Выбрано окно направления.');break;
       case 'plan-filter':slice=d;await openPlan();break;
       case 'truck-form':calculateTruck(d);break;
+      case 'truck-confirm-form':{
+        const plan=currentTruckPlan();
+        if(!plan)throw Error('Смена изменилась. Сначала пересчитайте маршрут.');
+        await truckCommand('confirm',{config:plan.config,stops:plan.stops.map(stop=>({id:stop.id,
+          pickup:stop.pickup.map(o=>o.id),drop:stop.drop.map(o=>o.id)}))});break;
+      }
+      case 'truck-delay-form':await truckCommand('delay',{minutes:Number(d.minutes)});break;
+      case 'truck-scan-form':await scanTruckInput(d.order_id);break;
+      case 'truck-next-form':await truckCommand(d.action,{acknowledge:true});break;
+      case 'truck-cancel-form':await truckCommand('cancel');break;
       case 'order-search':orderSearch=d.search.trim();render();break;
-      case 'reset-form':truckPlan=null;moveMap(0,0,1);await change('demo/reset',{scenario:d.scenario},'Открыта чистая смена.');break;
+      case 'reset-form':truckPlan=null;showTruck=false;focusedTruckStop=null;moveMap(0,0,1);await change('demo/reset',{scenario:d.scenario},'Открыта чистая смена.');break;
       case 'clock-form':await change('clock',{now:d.now+':00+03:00'},'Часы переведены.');break;
       case 'profile-form':await change('profile',{profile:d.profile},'Активный договор обновлён.');break;
       case 'conditions':{

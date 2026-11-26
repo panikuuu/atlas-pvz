@@ -5,8 +5,9 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const source = fs.readFileSync(path.join(__dirname,'../app/static/map.js'),'utf8');
 const truck = fs.readFileSync(path.join(__dirname,'../app/static/truck.js'),'utf8');
+const network = JSON.parse(fs.readFileSync(path.join(__dirname,'../app/static/roads.json'),'utf8'));
 const model = vm.runInNewContext(source+'\n'+truck+
-  '\n;({stations,roadGraph,routeEdges,pathOf,mapTerrain,networkMap,planTruck,truckSample,moveMap,zoomMap,mapViewBox})');
+  '\n;loadRoads(network);({stations,roadGraph,routeEdges,pathOf,mapTerrain,networkMap,planTruck,truckSample,moveMap,zoomMap,mapViewBox})',{network});
 assert.equal(Object.keys(model.stations).length,10);
 const terrain = model.mapTerrain();
 const painted = coords => {
@@ -48,6 +49,7 @@ const orders=model.truckSample(departure);
 const config={start:'F',end:'K',departure,liters:24,grams:10000};
 const plan=model.planTruck(orders,config);
 assert.equal(plan.included.length,orders.length);
+assert(plan.separateCost>0&&plan.extraCost>0&&plan.hubCost>0);
 assert.equal(new Set(plan.stops.map(stop=>stop.id)).size,9);
 assert.equal(plan.stops[0].id,'F');
 assert.equal(plan.stops.at(-1).id,'K');

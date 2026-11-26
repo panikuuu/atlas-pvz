@@ -1,47 +1,30 @@
 'use strict';
 const mapWidth=1040, mapHeight=510;
-const stations={
-  A:{x:150,y:215,letter:'А',title:'Центр',area:'Город'},
-  B:{x:352,y:121,letter:'Б',title:'Университет',area:'Город'},
-  C:{x:647,y:303,letter:'В',title:'Райцентр',area:'Посёлок'},
-  D:{x:871,y:165,letter:'Г',title:'Озёрное',area:'Село'},
-  HUB:{x:366,y:383,letter:'Х',title:'Хаб',area:'Промзона'},
-  E:{x:92,y:93,letter:'Д',title:'Северный',area:'Город'},
-  F:{x:89,y:378,letter:'Е',title:'Вокзальный',area:'Город'},
-  G:{x:603,y:95,letter:'Ж',title:'Боровое',area:'Деревня'},
-  J:{x:821,y:407,letter:'З',title:'Луговая',area:'Деревня'},
-  K:{x:966,y:303,letter:'И',title:'Мельницы',area:'Деревня'}
-};
-const junctions={...stations, west:{x:241,y:203}, north:{x:280,y:132},
-  south:{x:228,y:344}, northBank:{x:446,y:112}, northBridge:{x:510,y:112},
-  southBank:{x:445,y:278}, bridge:{x:521,y:278},
-  fork:{x:734,y:245}, mill:{x:918,y:260}};
-const roads=[
-  ['E','A',[[92,148],[137,148]]],['E','north',[[172,93],[190,118]]],
-  ['A','west',[[195,215]]],['west','north',[[244,152]]],['north','B',[[315,132]]],
-  ['F','A',[[89,300],[150,291]]],['F','south',[[161,378],[180,344]]],
-  ['A','south',[[194,266],[194,321]]],['south','HUB',[[278,350],[306,383]]],
-  ['HUB','B',[[380,289],[368,230],[368,161]]],
-  ['west','southBank',[[288,207],[338,247],[401,258]]],
-  ['HUB','southBank',[[419,357],[438,319]]],['southBank','bridge',[]],
-  ['bridge','fork',[[552,266],[612,250],[677,252]]],
-  ['bridge','C',[[566,287],[599,307]]],['C','fork',[[679,295],[700,259]]],
-  ['fork','D',[[762,237],[797,191],[831,191]]],['D','mill',[[899,185],[907,226]]],
-  ['mill','K',[[947,272]]],['K','J',[[927,349],[864,365]]],
-  ['J','C',[[788,386],[749,388],[712,350],[665,337]]],
-  ['G','fork',[[645,116],[645,166],[700,211]]],
-  ['B','northBank',[[405,104]]],['northBank','northBridge',[]],
-  ['northBridge','G',[[547,89]]]
-];
-// Geometry for a road is shared by the road surface, route strokes and direction arrows.
-const roadGraph=new Map(Object.keys(junctions).map(id=>[id,[]]));
-for(const [from,to,bends] of roads){
-  const coords=[junctions[from],...bends.map(([x,y])=>({x,y})),junctions[to]];
-  const length=coords.slice(1).reduce((n,p,i)=>n+Math.hypot(p.x-coords[i].x,p.y-coords[i].y),0);
-  roadGraph.get(from).push({to,coords,length});
-  roadGraph.get(to).push({to:from,coords:[...coords].reverse(),length});
-}
+let stations,roadGraph,roads,roadNetwork;
 const roadPaths=new Map();
+
+function loadRoads(network){
+  roadNetwork=network;
+  ({stations,roads}=network);
+  const junctions={...stations,...network.junctions};
+  roadGraph=new Map(Object.keys(junctions).map(id=>[id,[]]));
+  roadPaths.clear();
+  terrain=null;
+  for(const [from,to,bends] of roads){
+    const coords=[junctions[from],...bends.map(([x,y])=>({x,y})),junctions[to]];
+    const length=coords.slice(1).reduce((n,p,i)=>n+Math.hypot(p.x-coords[i].x,p.y-coords[i].y),0);
+    roadGraph.get(from).push({to,coords,length});
+    roadGraph.get(to).push({to:from,coords:[...coords].reverse(),length});
+  }
+}
+
+async function ensureRoads(){
+  if(roadNetwork)return;
+  const response=await fetch('/roads.json');
+  if(!response.ok)throw Error('Не удалось загрузить схему дорог.');
+  loadRoads(await response.json());
+}
+
 function roadRoute(start,end){
   if(!roadGraph.has(start)||!roadGraph.has(end))throw Error('Неизвестная точка на карте');
   const key=start+'→'+end;
@@ -144,7 +127,9 @@ function networkMap(source,destination,mode,plan=null){
         arrows.push(position);
       }
     }
-    return mapSvg(routeStroke(edges,'#fffdf5',9)+routeStroke(edges,color,5)+
+    const focus=plan.legs[plan.focus-1]?.edges;
+    const highlight=focus?routeStroke(focus,'#fffbec',11)+routeStroke(focus,'#a85020',6):'';
+    return mapSvg(routeStroke(edges,'#fffdf5',9)+routeStroke(edges,color,5)+highlight+
       arrows.map(p=>arrow(p,color)).join('')+pointMarkers([],true,plan.stops));
   }
   const direct=routeEdges(source,destination),hub=routeEdges(source,destination,true);

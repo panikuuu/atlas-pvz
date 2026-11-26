@@ -2,6 +2,11 @@
 let slice={date:'2026-11-25',district:'all',demand:'neutral',window:'day',consent:'0'};
 let visiblePlan=null;
 let truckPlan=null;
+let activeTruck=null;
+let showTruck=false;
+let truckViewInitialized=null;
+let focusedTruckStop=null;
+let cargoOnly=false;
 
 function shiftTruckOrders(){
   return s.orders.filter(o=>o.status==='ASSEMBLED'&&!o.dispatch_id).map(o=>({
@@ -28,12 +33,14 @@ function truckForm(){
 }
 
 function calculateTruck(fields){
-  const config={kind:fields.kind,start:fields.start,end:fields.end,
+  const config={kind:fields.kind,start:fields.start,end:fields.end,profile:s.profile,
     departure:Date.parse(fields.departure+':00+03:00'),liters:Number(fields.liters),grams:Math.round(Number(fields.mass)*1000)};
   if(config.departure<Date.parse(s.now))throw Error('Время выезда уже прошло по часам смены.');
   const orders=config.kind==='sample'?truckSample(config.departure):shiftTruckOrders();
   if(!orders.length)throw Error('В смене нет собранных заказов, ещё не назначенных в рейс.');
   truckPlan=planTruck(orders,config);
+  showTruck=false;
+  focusedTruckStop=null;
   truckPlan.shiftKey=JSON.stringify([s.epoch,shiftTruckOrders()]);
   moveMap(0,0,1);
   dialog.close();
@@ -72,19 +79,131 @@ function truckItinerary(plan){
   }).join('');
   const unplanned=rejected.length?'<details class="truck-exceptions"><summary>Вне плана · '+rejected.length+'</summary><ul>'+
     rejected.map(o=>'<li>'+esc(o.id)+' · '+esc(loc(o.from)+' → '+loc(o.to))+' · '+esc(o.reason)+'</li>').join('')+'</ul></details>':'';
-  const economics=included.length?'<details class="truck-economics"><summary>Оценка дополнительной стоимости</summary>'+
-    dl([['Крюк к плановому пути',num(plan.extraKm)+' км'],['Дополнительные расходы и скидки',money(plan.extraCost)],
-      ['Те же посылки через хаб',money(plan.hubCost)],['Разница в пользу рейса',signed(plan.hubCost-plan.extraCost)]])+
-    '<p class="micro">Расчёт по модельным ставкам для уже запланированной машины.</p></details>':'';
+  const economics=included.length?truckEconomics({multi:plan.extraCost,separate:plan.separateCost,hub:plan.hubCost,extra_km:plan.extraKm},plan.stops):'';
+  const available=!activeTruck||!['CONFIRMED','IN_PROGRESS'].includes(activeTruck.status);
   return '<section id="truck-itinerary" class="panel truck-itinerary" tabindex="-1"><div class="panel-head"><div><h2>Маршрутный лист</h2><small>'+
     (config.kind==='sample'?'Тестовые заказы':'Собранные заказы смены')+' · '+esc(tm(config.departure))+' мск</small></div>'+
-    '<div class="section-actions">'+button('truck-form','Пересчитать','filter')+
+    '<div class="section-actions">'+button('truck-confirm','Подтвердить рейс','truck',true,available&&included.length?'':'disabled')+button('truck-form','Пересчитать','filter')+
     button('truck-export','Скачать','download',false,included.length?'':'disabled')+button('truck-clear','К рейсам','route')+'</div></div>'+
     '<div class="truck-totals">'+dl([['В рейсе',included.length+' из '+(included.length+rejected.length)+' зак.'],
       ['Путь по дорогам',num(km)+' км'],['Время рейса',minutes(duration)],
       ['Пиковая загрузка',num(peakLiters)+' / '+num(config.liters)+' л · '+num(peakGrams/1000)+' / '+num(config.grams/1000)+' кг']])+'</div>'+
     (included.length?'<ol class="truck-timeline">'+content+'</ol>':empty('При заданных условиях ни один заказ не вошёл в рейс.'))+
     unplanned+economics+'</section>';
+}
+
+function truckEconomics(cost,stops){
+  const {km,stopMinute}=roadNetwork.rates;
+  const rows=stops.flatMap((v,i)=>{
+    const count=v.pickup.length+v.drop.length;
+    if(!count)return [];
+    const detour=cost.per_stop?.[i]??(i>0&&i<stops.length-1?Math.round(Math.max(0,
+      truckLeg(stops[i-1].id,v.id).km+truckLeg(v.id,stops[i+1].id).km-truckLeg(stops[i-1].id,stops[i+1].id).km)*km):0);
+    return [[esc(loc(v.id)),num(count),money(stopMinute*(4+count)),money(detour)]];
+  });
+  return '<details class="truck-economics"><summary>Сравнение затрат на доставку</summary>'+
+    dl([['Попутный рейс с остановками',money(cost.multi)],['Отдельные рейсы по направлениям',money(cost.separate)],
+      ['Доставка через хаб',money(cost.hub)],['Крюк относительно пути без остановок',num(cost.extra_km)+' км'],
+      ['Разница между хабом и попутным рейсом',signed(cost.hub-cost.multi)]])+
+    table(['ПВЗ','Операции','Обработка','Крюк'],rows)+
+    '<p class="micro">Крюк показывает, на сколько изменится путь при пропуске этой остановки. Оценки соседних заездов зависят друг от друга. Все суммы рассчитаны по модельным ставкам.</p></details>';
+}
+
+function activeMapPlan(run){
+  const legs=run.stops.slice(1).map((v,i)=>truckLeg(run.stops[i].id,v.id));
+  return {stops:run.stops,legs,focus:focusedTruckStop??run.cursor};
+}
+
+const runStatuses={CONFIRMED:'Готов к выезду',IN_PROGRESS:'В пути',COMPLETED:'Завершён',CANCELLED:'Отменён'};
+const scanLabels={pickup:'Погрузить',drop:'Выгрузить',missed:'Остался в ПВЗ',retry:'Выгрузка перенесена',delay:'Задержка'};
+function executionView(run){
+  if(!run)return panel('Текущий рейс',empty('В этой смене пока нет подтверждённого рейса.'));
+  const ctl=role==='dispatcher';
+  const current=run.status==='IN_PROGRESS'?run.stops[run.cursor]:null;
+  const title=runStatuses[run.status]+' · '+(run.kind==='sample'?'Тестовый рейс':'Заказы смены');
+  const buttons=ctl&&run.status==='CONFIRMED'?button('truck-start','Начать рейс','play',true)+button('truck-cancel','Отменить рейс'):
+    ctl&&current?button('truck-delay','Задержка','clock')+button('truck-review-stop','Завершить остановку','route',true):'';
+  const counts=Object.values(run.orders).reduce((acc,o)=>({...acc,[o.status]:(acc[o.status]||0)+1}),{});
+  const focused=focusedTruckStop??Math.min(run.cursor,run.stops.length-1);
+  const timeline=run.stops.map((v,i)=>{
+    if(cargoOnly&&!v.load?.ids.length)return '';
+    const time=tm(v.arrive).split(', ').at(-1);
+    const state=v.closed?'Пройдена':v===current?'Текущая':'По плану';
+    return '<li class="'+(i===focused?'current-stop':'')+'"><button class="truck-stop" data-action="truck-stop" data-id="'+i+'">'+
+      '<span class="truck-number">'+(i+1)+'</span><span><strong>'+esc(loc(v.id))+'</strong><small>'+esc(time)+' · '+state+'</small></span></button>'+
+      '<div class="truck-operations"><span>−'+v.drop.length+' / +'+v.pickup.length+'</span></div>'+
+      '<div class="truck-load">'+num(v.load?.liters)+' л · '+num(v.load?.grams/1000)+' кг</div>'+
+      (v.load?.ids.length?'<details><summary>Груз после остановки</summary>'+esc(v.load.ids.join(', '))+'</details>':'')+'</li>';
+  }).join('');
+  const pendingRows=current?['drop','pickup'].flatMap(kind=>current[kind].flatMap(id=>{
+    const order=run.orders[id];
+    const expected=kind==='drop'?'ONBOARD':'WAITING';
+    if(order.status!==expected)return [];
+    return [[esc(id),esc(loc(kind==='drop'?order.from:order.to)),button('truck-scan',scanLabels[kind],'scan',kind==='drop',
+      'data-kind="'+kind+'" data-id="'+esc(id)+'"')]];
+  })):[];
+  const events=current?.actions.map(e=>[esc(scanLabels[e.kind]),esc(e.order_id|| (e.minutes?e.minutes+' мин':e.orders?.join(', '))),esc(tm(e.at))])||[];
+  return '<section class="panel truck-itinerary" id="truck-itinerary" tabindex="-1"><div class="panel-head"><div><h2>Маршрутный лист</h2><small>'+
+    esc(title)+'</small></div><div class="section-actions">'+buttons+(ctl?button('truck-clear','К карте','map'):'')+'</div></div>'+
+    '<div class="truck-totals">'+dl([['В машине',num(run.load.ids.length)+' зак. · '+num(run.load.liters)+' л · '+num(run.load.grams/1000)+' кг'],
+      ['Доставлено',num(counts.DELIVERED||0)],['Не принято',num(counts.MISSED||0)],['Расчётный путь',num(run.economics.km)+' км']])+'</div>'+
+    (run.notices.length?'<details class="truck-alerts"><summary>Предупреждения · '+run.notices.length+'</summary><ul>'+
+      run.notices.map(note=>'<li>'+esc(note)+'</li>').join('')+'</ul></details>':'')+
+    (current?'<section class="truck-current"><h3>'+esc(loc(current.id))+'</h3><p class="micro">Отметьте посылки, которые фактически переданы или приняты на этой остановке.</p>'+
+    (pendingRows.length?'<form id="truck-scan-form" class="truck-scan-form">'+
+      field('Номер заказа','order_id','text','','required maxlength="100" autocomplete="off"')+
+      '<button class="btn">Отметить</button></form>':'')+
+    table(['Заказ','Другой ПВЗ','Операция'],pendingRows,'Все доступные операции на остановке выполнены.')+
+    (events.length?'<details><summary>Операции на остановке</summary>'+table(['Действие','Заказ / длительность','Время'],events)+'</details>':'')+'</section>':'')+
+    (run.load.ids.length?'<div class="truck-current"><strong>Сейчас в машине</strong><p>'+esc(run.load.ids.join(', '))+'</p></div>':'')+
+    '<div class="truck-current"><label><input id="truck-cargo-only" type="checkbox" '+(cargoOnly?'checked':'')+'> Только остановки с грузом после визита</label></div>'+
+    '<ol class="truck-timeline">'+(timeline||'<li>По этому фильтру остановок нет.</li>')+'</ol>'+
+    truckEconomics(run.economics,run.stops)+'</section>';
+}
+
+async function truckCommand(action,data={}){
+  const body=action==='confirm'?{action,...data}:{action,run_id:activeTruck.id,version:activeTruck.version,...data};
+  let run;
+  try {
+    ({run}=await api('truck',body));
+  } catch(error) {
+    if(error.message.endsWith('(409)'))await refresh();
+    throw error;
+  }
+  activeTruck=run;
+  showTruck=true;
+  focusedTruckStop=null;
+  truckPlan=null;
+  dialog.close();
+  await refresh();
+}
+
+async function scanTruckInput(value){
+  const run=activeTruck,v=run?.stops[run.cursor],id=value.trim();
+  if(!v||!id)throw Error('Укажите номер заказа на текущей остановке.');
+  const kind=v.drop.includes(id)?'drop':'pickup';
+  await truckCommand('scan',{order_id:id,kind});
+  document.querySelector('#truck-scan-form input')?.focus({preventScroll:true});
+}
+
+function confirmTruck(){
+  const plan=currentTruckPlan();
+  if(!plan?.included.length)return;
+  dialogBox('Подтвердить рейс',form('truck-confirm-form',
+    '<p>За машиной будут закреплены '+num(plan.included.length)+' зак. из '+(plan.config.kind==='sample'?'тестового набора.':'текущей смены.')+'</p>',
+    'Подтвердить рейс'));
+}
+
+function reviewTruckStop(){
+  const run=activeTruck,v=run.stops[run.cursor];
+  const missed=v.pickup.filter(id=>run.orders[id].status==='WAITING');
+  const onboard=v.drop.filter(id=>run.orders[id].status==='ONBOARD');
+  const text=onboard.length?'Останутся в машине до повторного заезда: '+onboard.join(', ')+'. ':
+    'Атлас откроет следующую остановку. ';
+  const pending=missed.length?'Непринятые заказы останутся в ПВЗ и будут доступны для другого рейса: '+missed.join(', ')+'.':'';
+  dialogBox(onboard.length?'Перенести выгрузку':'Завершить остановку',
+    form('truck-next-form','<p>'+esc(text+pending)+'</p><input type="hidden" name="action" value="'+(onboard.length?'skip':'next')+'">',
+      onboard.length?'Добавить повторный заезд':'Завершить остановку'));
 }
 
 function exportTruck(){

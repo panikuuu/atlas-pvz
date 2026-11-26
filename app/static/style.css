@@ -66,6 +66,7 @@
   .route-panel .tariff-note { grid-column:1/-1; }
 }
 .legend-stroke.truck { border-color:#087366; }
+.legend-stroke.focus-segment { border-color:#a85020; }
 .legend-stroke.stop { width:11px; height:11px; border:0; border-radius:50%; background:#086b60; }
 .truck-itinerary .panel-head { align-items:flex-start; flex-wrap:wrap; gap:10px; }
 .truck-itinerary:focus { outline:none; }
@@ -85,6 +86,15 @@
 .truck-timeline details { grid-column:1/-1; padding-left:36px; font-size:12px; }
 .truck-timeline summary { width:fit-content; color:var(--muted); }
 .truck-exceptions,.truck-economics { margin:4px 18px 14px; border-top:1px solid var(--line); padding-top:9px; }
+.truck-current { margin:8px 18px; padding:10px 0; border-top:1px solid var(--line); }
+.truck-current h3,.truck-current p { margin:0 0 5px; }
+.truck-current .table-wrap { overflow-x:auto; }
+.truck-scan-form { display:flex; align-items:end; flex-wrap:wrap; gap:6px; margin:9px 0; }
+.truck-scan-form label { display:grid; flex:1 1 125px; font-size:12px; }
+.truck-scan-form input { min-width:0; }
+.truck-alerts { margin:8px 18px; padding:8px 10px; color:#813f12; background:#fff1de; border-radius:8px; }
+.truck-alerts ul { margin:6px 0 0; padding-left:20px; }
+.truck-timeline > .current-stop { background:#edf6f3; }
 @media(min-width:1220px) {
   .map-grid.has-itinerary { grid-template-columns:minmax(0,1fr) 365px; align-items:start; }
   .has-itinerary .truck-itinerary { max-height:calc(100vh - 148px); overflow:auto; }

@@ -5,6 +5,58 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/truck": {
+      "get": {
+        "operationId": "get_truck_run",
+        "summary": "Текущий маршрутный лист смены",
+        "responses": {
+          "200": {
+            "description": "Рейс и его версия. Если рейса ещё не было, run равен null.",
+            "content": {"application/json":{"schema":{"type":"object","required":["run"],"properties":{"run":{"type":["object","null"]}}}}}
+          },
+          "403": {"description":"Недостаточно прав"}
+        }
+      },
+      "post": {
+        "operationId": "apply_truck_command",
+        "summary": "Подтверждение, выполнение и пересчёт рейса",
+        "parameters": [
+          {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","minLength":1,"maxLength":128}},
+          {"name":"X-Role","in":"header","schema":{"enum":["dispatcher","pvz"]},"description":"Сотрудник ПВЗ может выполнять только scan"}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json":{"schema":{
+            "type":"object","required":["action"],
+            "properties":{
+              "action":{"enum":["confirm","start","scan","delay","next","skip","cancel"]},
+              "run_id":{"type":"string"},
+              "version":{"type":"integer","minimum":1},
+              "config":{"type":"object","required":["kind","start","end","departure","liters","grams"],
+                "properties":{"kind":{"enum":["sample","shift"]},"start":{"type":"string"},"end":{"type":"string"},
+                  "departure":{"type":"integer","description":"Время выезда в Unix миллисекундах"},"liters":{"type":"number"},"grams":{"type":"number"}}},
+              "stops":{"type":"array","minItems":2,"maxItems":30,"items":{"type":"object","required":["id","pickup","drop"],
+                "properties":{"id":{"type":"string"},"pickup":{"type":"array","items":{"type":"string"}},"drop":{"type":"array","items":{"type":"string"}}}}},
+              "order_id":{"type":"string"},
+              "kind":{"enum":["pickup","drop"]},
+              "minutes":{"type":"number","minimum":1,"maximum":1440},
+              "acknowledge":{"type":"boolean"}
+            },
+            "allOf":[
+              {"if":{"properties":{"action":{"const":"confirm"}}},"then":{"required":["config","stops"]},"else":{"required":["run_id","version"]}},
+              {"if":{"properties":{"action":{"const":"scan"}}},"then":{"required":["kind","order_id"]}},
+              {"if":{"properties":{"action":{"const":"delay"}}},"then":{"required":["minutes"]}}
+            ]
+          }}}
+        },
+        "responses":{
+          "200":{"description":"Обновлённый маршрутный лист"},
+          "403":{"description":"Недостаточно прав"},
+          "409":{"description":"Устаревшая версия, конфликт со статусом заказа или ограничениями рейса"},
+          "422":{"description":"Недопустимые параметры операции"}
+        }
+      }
+    },
     "/api/state": {
       "get": {
         "operationId": "get_state",

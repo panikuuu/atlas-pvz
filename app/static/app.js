@@ -19,8 +19,8 @@ const reasons={DIRECT_SAVES_COST:'Прямая доставка экономит
 const states={RESERVED:'В резерве',ASSEMBLED:'Собран',ASSIGNED:'В манифесте',IN_TRANSIT:'В пути',READY_FOR_PICKUP:'Готов к выдаче',ISSUED:'Выдан',RETURN_INSPECTION:'На проверке',RETURN_IN_TRANSIT:'В обратном рейсе',RETURNED:'Возвращён',QUARANTINED:'В карантине',AVAILABLE:'Доступен',AT_HUB:'На хабе'};
 const processes={ASSEMBLED:'Собрать',HANDED_OVER:'Передать перевозчику',ARRIVED:'Принять в ПВЗ',ISSUED:'Выдать покупателю',RETURNED:'Принять возврат',RETURN_SENT:'Передать возврат',RETURN_RECEIVED:'Вернуть на полку',QUARANTINED:'В карантин',INCIDENT:'Открыть инцидент',RECOVERED:'Подтвердить восстановление',WITHDRAW_REQUESTED:'Заказать вывоз',WITHDRAW_SENT:'Передать на хаб',WITHDRAW_RECEIVED:'Подтвердить приёмку хабом'};
 const scenarios={case1:['Городская доставка','10 посылок из Центра в Университет одним попутным рейсом.'],case2:['Единичный заказ','Сравнение хаба с отдельным кругом при закрытом попутном окне.'],case3:['Возврат товара','Возврат одной выданной посылки на исходную полку.'],case4:['Частичный сбой','Приёмка девяти посылок, поиск десятой и повтор сообщения.'],case5:['Долгое хранение','30 суток хранения и вывоз непроданного остатка.'],rural:['Сельское плечо','Две посылки из Райцентра в Озёрное при обещании 48 часов.'],sandbox:['Свободная смена','Приёмка и обработка собственных тестовых заказов.']};
-const pages={map:['map','Карта рейсов'],orders:['route','Заказы'],stock:['box','Склад и смена'],ledger:['receipt','Начисления'],portfolio:['chart','Экономика'],demo:['play','Сценарии'],metrics:['activity','Диагностика']};
-const allowedPages={dispatcher:Object.keys(pages),pvz:['stock','orders','ledger'],seller:['stock','orders','ledger']};
+const pages={map:['map','Карта рейсов'],orders:['route','Заказы'],stock:['box','Склад и смена'],ledger:['receipt','Начисления'],portfolio:['chart','Экономика'],demo:['play','Сценарии'],metrics:['activity','Диагностика'],truck:['truck','Текущий рейс']};
+const allowedPages={dispatcher:Object.keys(pages).filter(p=>p!=='truck'),pvz:['stock','orders','ledger','truck'],seller:['stock','orders','ledger']};
 let role=localStorage.getItem('atlas-role')||'dispatcher';if(!allowedPages[role])role='dispatcher';
 let activePage=location.hash.slice(1);if(!allowedPages[role].includes(activePage))activePage=allowedPages[role][0];
 let s={},loadSequence=0,consent=0,portfolio=null,busy=false,toastTimer,sortOrders='id';
@@ -60,7 +60,14 @@ async function refresh(){
   const seq=++loadSequence;
   try{
     /** @type {import('./api').State} */
-    const state=await api('state');if(seq!==loadSequence)return;s=state;s.orders??=[];s.lots??=[];s.ledger??=[];s.settings??={};s.points??=[];s.totals??={};s.metrics??={};s.steps??=[];
+    const [,state,truck]=await Promise.all([ensureRoads(),api('state'),role==='seller'?null:api('truck')]);
+    if(seq!==loadSequence)return;
+    activeTruck=truck?.run||null;
+    if(activeTruck&&['CONFIRMED','IN_PROGRESS'].includes(activeTruck.status)&&truckViewInitialized!==activeTruck.id){
+      showTruck=true;
+      truckViewInitialized=activeTruck.id;
+    }
+    s=state;s.orders??=[];s.lots??=[];s.ledger??=[];s.settings??={};s.points??=[];s.totals??={};s.metrics??={};s.steps??=[];
     $('#connection').textContent='Стенд на связи';$('#connection-dot').classList.add('live');
     render();if(activePage==='portfolio')await loadPortfolio();
   }catch(e){if(seq!==loadSequence)return;
@@ -77,7 +84,7 @@ function render(){
   $('#nav').innerHTML=allowedPages[role].map((p,i)=>((i===4||i===5)?'<div class="nav-sep"></div>':'')+'<button class="nav-item '+(p===activePage?'current':'')+'" data-page="'+p+'" title="'+pages[p][1]+'" aria-label="'+pages[p][1]+'" '+(p===activePage?'aria-current="page"':'')+'>'+icon(pages[p][0],19)+'<span>'+pages[p][1]+'</span></button>').join('');
   $('#crumb').innerHTML='Рабочее место <b> / '+esc(pages[activePage][1])+'</b>';
   $('#clock-control').innerHTML=icon('clock',15)+'<span>'+esc(tm(s.now))+'</span><span class="clock-long">мск</span>';
-  main.innerHTML=({map:mapPage,orders:ordersPage,stock:stockPage,ledger:ledgerPage,portfolio:portfolioPage,demo:demoPage,metrics:metricsPage})[activePage]();
+  main.innerHTML=({map:mapPage,orders:ordersPage,stock:stockPage,ledger:ledgerPage,portfolio:portfolioPage,demo:demoPage,metrics:metricsPage,truck:()=>title('Текущий рейс')+executionView(activeTruck)})[activePage]();
   if(activePage==='map')bindMapControls(document.getElementById('city-map'));
   main.setAttribute('aria-busy','false');
 }
@@ -85,6 +92,9 @@ function routeState(){return {src:s.settings.source||'A',dest:s.settings.destina
 function mapPage(){
   const {src,dest,q}=routeState(),{totals:t}=s,selected=q?.selected,candidates=q?.candidates||[];
   const plan=currentTruckPlan();
+  const run=showTruck?activeTruck:null;
+  const itinerary=run?executionView(run):(plan?truckItinerary(plan):null);
+  const mapPlan=run?activeMapPlan(run):plan?.included.length?{...plan,focus:focusedTruckStop}:null;
   const eligibleOrders=s.orders.filter(o=>o.source===src&&o.destination===dest&&['RESERVED','ASSEMBLED'].includes(o.status));
   const candidate=q?.candidates?.find(c=>c.mode===selected);
   const ready=eligibleOrders.length,savings=q?.savings??candidate?.savings;
@@ -100,18 +110,19 @@ function mapPage(){
   const mapHeader='<div class="panel-head"><div class="section-title">'+icon('map',19)+'<h2>Схема сети</h2></div><div class="section-actions">'+
     (s.scenario==='sandbox'?button('direction','Направление','route'):'')+
     button('network-plan','План сети','layers')+button('settings','Условия рейса','filter')+
+    (activeTruck&&!run?button('truck-open','Текущий рейс','truck'):'')+
     button('truck-form','Спланировать рейс','truck',true)+'</div></div>';
-  const legend=plan?.included.length?[['truck','Запланированный рейс'],['stop','Номер остановки']]:
+  const legend=mapPlan?[['truck','Маршрут'],['stop','Номер остановки'],...(mapPlan.focus>0?[['focus-segment','Выбранный участок']]:[])]:
     [['','Прямой рейс'],['dashed','Через хаб'],['gray','Вне выбранного рейса']];
-  const mapVisual='<div class="map-wrap">'+networkMap(src,dest,selected,plan?.included.length?plan:null)+
+  const mapVisual='<div class="map-wrap">'+networkMap(src,dest,selected,mapPlan)+
     '<div class="map-tools">'+[['minus','Уменьшить'],['plus','Увеличить'],['fit','Вся сеть']].map(([a,v])=>'<button data-action="zoom-'+a+'" title="'+v+'" aria-label="'+v+'">'+icon(a,15)+'</button>').join('')+
     '</div></div><div class="map-legend">'+legend.map(([a,v])=>'<span class="legend-item"><i class="legend-stroke '+a+'"></i>'+v+'</span>').join('')+'</div>';
   const dir=pointName(src)+' → '+pointName(dest);
   return title('Карта рейсов','Учебная агломерация · '+tm(s.now).split(',')[0]+' · Московское время',button('profile',prof(s.profile),'contract'))+
-    (plan?'':stats([['box','Заказов в направлении',num(s.orders.filter(o=>o.source===src&&o.destination===dest).length)],['truck','Свободных попутных мест',num(s.settings.shared_slots)],['target','Индекс рейса, из 100',num(q?.index??candidate?.index)],['trend','Экономия по расчёту',signed(savings)]]))+
-    '<div class="map-grid'+(plan?' has-itinerary':'')+'"><section class="panel">'+mapHeader+mapVisual+'</section>'+
-    (plan?truckItinerary(plan):'<section class="panel route-panel">'+routeInfo+'</section>')+'</div>'+
-    (plan?'':(
+    (itinerary?'':stats([['box','Заказов в направлении',num(s.orders.filter(o=>o.source===src&&o.destination===dest).length)],['truck','Свободных попутных мест',num(s.settings.shared_slots)],['target','Индекс рейса, из 100',num(q?.index??candidate?.index)],['trend','Экономия по расчёту',signed(savings)]]))+
+    '<div class="map-grid'+(itinerary?' has-itinerary':'')+'"><section class="panel">'+mapHeader+mapVisual+'</section>'+
+    (itinerary||'<section class="panel route-panel">'+routeInfo+'</section>')+'</div>'+
+    (itinerary?'':(
     panel('Направления смены',table(['Направление','Заказы к окну','Попутный остаток','Решение','Экономия'],[[linkButton(q?'compare':'settings',src+'-'+dest,dir),esc(ready)+' шт.',esc(num(s.settings.shared_slots))+' мест',chip(modes[selected]||'Ожидает расчёта',q?'accent':''),signed(savings)]]),button('demo-page','Демо-сценарии','play'))+
     panel('Результат по факту',pad(dl([['Вклад RWB',money(t.rwb_contribution)],['Эффект программы против централизованной схемы',signed(t.program_delta)],['Готовы к исходному сроку',num(t.on_time)+' из '+num(t.ready_count)]])))));
 }

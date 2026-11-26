@@ -12,6 +12,7 @@ import time
 from urllib.error import URLError
 
 from test_cases import request
+from test_truck_runs import command, confirm, truck
 
 
 def wait_window(folder, proc):
@@ -45,12 +46,17 @@ def verify(exe):
                     request(url,"/api/demo/step",{})
                     state=request(url,"/api/state")
                     assert state["step"]==1 and state["lots"]
+                    route=[("F",["Т-01"],[]),("A",[],["Т-01"])]
+                    run=truck(url,confirm(url,"sample",route))
+                    run=command(url,run,"start")
+                    run=command(url,run,"scan",kind="pickup",order_id="Т-01")
                     duplicate=subprocess.run([target],cwd=folder,env=env,timeout=20)
                     assert duplicate.returncode==0 and wait_window(folder,proc)==(url,hwnd,pid)
                 else:
                     restored=request(url,"/api/state")
                     for key in ("epoch","step","lots","ledger"):
                         assert restored[key]==state[key],key
+                    assert truck(url)==run and run["load"]["ids"]==["Т-01"]
                 # WM_CLOSE is the same close request issued by the title bar's X.
                 assert user.PostMessageW(wintypes.HWND(hwnd),0x0010,0,0)
                 assert proc.wait(timeout=20)==0

@@ -1,14 +1,9 @@
 'use strict';
 
-// The offline road map is schematic. Use the same paths for distance, ETA and drawing.
-const roadScaleKm = 0.075;
-const truckSpeedKmh = 40;
-const truckRates = {km:2200, stopMinute:400, sellerDiscount:700, cityHub:11500, ruralHub:17728};
-
 function truckLeg(from,to){
   const edges=roadRoute(from,to);
-  const km=edges.reduce((total,edge)=>total+edge.length,0)*roadScaleKm;
-  return {from,to,edges,km,minutes:km/truckSpeedKmh*60};
+  const km=edges.reduce((total,edge)=>total+edge.length,0)*roadNetwork.scaleKm;
+  return {from,to,edges,km,minutes:km/roadNetwork.speedKmh*60};
 }
 
 function simulateTruck(visits,config){
@@ -126,13 +121,22 @@ function planTruck(orders,config){
   ({visits,result}=shortenTruckPlan(visits,result,config));
   const included=visits.flatMap(v=>v.pickup);
   const baseKm=truckLeg(config.start,config.end).km;
+  const truckRates=roadNetwork.rates;
+  const discount=sellerDiscount(config.profile)*included.length;
   const extraKm=Math.max(0,result.km-baseKm);
   const extraCost=Math.round(extraKm*truckRates.km)+result.serviceMinutes*truckRates.stopMinute+
-    included.length*truckRates.sellerDiscount;
+    discount;
   const hubCost=included.reduce((total,order)=>total+
     ([order.from,order.to].some(p=>['Село','Деревня','Посёлок'].includes(stations[p].area))?
       truckRates.ruralHub:truckRates.cityHub),0);
-  return {...result,config,rejected,included,extraKm,extraCost,hubCost};
+  const lanes=new Map(included.map(order=>[order.from+order.to,[order.from,order.to]]));
+  const separateCost=[...lanes.values()].reduce((total,[from,to])=>total+truckRates.dedicatedFixed+
+    Math.round(2*truckLeg(from,to).km*truckRates.km),0)+(8*lanes.size+2*included.length)*truckRates.stopMinute+discount;
+  return {...result,config,rejected,included,extraKm,extraCost,hubCost,separateCost};
+}
+
+function sellerDiscount(profile){
+  return profile==='original'?1000:roadNetwork.rates.sellerDiscount;
 }
 
 function truckSample(departure){
