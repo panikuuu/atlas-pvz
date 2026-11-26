@@ -2,7 +2,7 @@
 
 Атлас распределяет заказы между машинами и ПВЗ, составляет расписание погрузки и выгрузки и сравнивает расходы с отправкой через хаб. В расчёте рабочего дня видны вклад RWB, маржа ПВЗ и прибыль продавцов. Для пилотного и исходного договоров можно рассчитать допустимые ставки.
 
-**[Последний опубликованный релиз для Windows x64](https://github.com/panikuuu/atlas-pvz/releases/latest)** · [Сборки ветки main в GitHub Actions](https://github.com/panikuuu/atlas-pvz/actions/workflows/checks.yml?query=branch%3Amain) · [Запуск из исходников](#запуск-из-исходников)
+**[Стабильный релиз v1.4.0 для Windows x64](https://github.com/panikuuu/atlas-pvz/releases/tag/v1.4.0)** · [Все релизы](https://github.com/panikuuu/atlas-pvz/releases) · [Запуск в Docker](#запуск-в-docker) · [Проверки релиза](https://github.com/panikuuu/atlas-pvz/actions/runs/45778786181)
 
 ## Запуск на Windows
 
@@ -101,7 +101,7 @@ python scripts/recommend_contract.py --from-plan fleet-2026-11-24.json --seller-
 docker compose up --build -d --wait
 ```
 
-После запуска контейнера откройте [локальное приложение](http://127.0.0.1:8080). Если порт 8080 занят, перед запуском укажите свободный порт в переменной `ATLAS_PORT` и используйте его в адресе. Команда `docker compose down` останавливает приложение. Смена сохраняется в именованном томе `atlas-data`.
+После запуска контейнера откройте [локальное приложение](http://127.0.0.1:8080). Готовность API можно проверить по `/health/ready`. Если порт 8080 занят, перед запуском укажите свободный порт в переменной `ATLAS_PORT` и используйте его в адресе. Команда `docker compose down` останавливает приложение. Смена сохраняется в именованном томе `atlas-data`.
 
 ## Запуск из исходников
 
@@ -113,4 +113,4 @@ python -B app/serve.py
 
 Откройте [локальное приложение](http://127.0.0.1:8080). Для создания Windows-архива из этой версии кода установите PyInstaller 6.22.3 на Windows x64 и выполните `python scripts/build_windows.py`. Архив появится в `dist/`.
 
-[Эксплуатация и диагностика](docs/operations.md) · [Спецификация API](app/openapi.json) · [Обзор проекта в PDF](docs/presentation.pdf)
+[Эксплуатация и диагностика](docs/operations.md) · [Спецификация API](app/openapi.json) · [Методика расчёта](app/static/economics.md)
