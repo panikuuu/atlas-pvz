@@ -14,16 +14,16 @@ const tm=v=>v?new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Moscow',day:'
 const isoField=v=>new Date(+new Date(v)+10800000).toISOString().slice(0,16);
 const prof=p=>p==='pilot'?'Пилотный договор':'Исходный договор';
 const loc=id=>stations[id]?.title||id||'—';
-const modes={SHARED_TRIP:'Попутный рейс',DEDICATED_TRIP:'Отдельный рейс',HUB:'Через хаб',COMBINED:'Смешанный план',MANUAL_EXCEPTION:'Исключение'};
+const modes={SHARED_TRIP:'Попутный рейс',DEDICATED_TRIP:'Отдельный рейс',HUB:'Через хаб',COMBINED:'Смешанный план',MANUAL_EXCEPTION:'Исключение',LOCAL_PICKUP:'Выдача из местного запаса'};
 const reasons={DIRECT_SAVES_COST:'Прямая доставка экономит средства',PAID_ROUNDTRIP_TOO_COSTLY:'Дорогой оплачиваемый круг',NO_CAPACITY:'Нет свободного места',DEADLINE_MISSED:'Пропущено окно готовности',PVZ_PEAK:'Не хватает времени смены',HUB_CHEAPER:'Через хаб выгоднее',DATA_MISSING:'Не хватает исходных данных',MANUAL_EXCEPTION:'Нужен разбор диспетчера',ELIGIBLE:'Доступен',OK:'Доступен'};
 const states={RESERVED:'В резерве',ASSEMBLED:'Собран',ASSIGNED:'В манифесте',IN_TRANSIT:'В пути',READY_FOR_PICKUP:'Готов к выдаче',ISSUED:'Выдан',RETURN_INSPECTION:'На проверке',RETURN_IN_TRANSIT:'В обратном рейсе',RETURNED:'Возвращён',QUARANTINED:'В карантине',AVAILABLE:'Доступен',AT_HUB:'На хабе'};
 const processes={ASSEMBLED:'Собрать',HANDED_OVER:'Передать перевозчику',ARRIVED:'Принять в ПВЗ',ISSUED:'Выдать покупателю',RETURNED:'Принять возврат',RETURN_SENT:'Передать возврат',RETURN_RECEIVED:'Вернуть на полку',QUARANTINED:'В карантин',INCIDENT:'Открыть инцидент',RECOVERED:'Подтвердить восстановление',WITHDRAW_REQUESTED:'Заказать вывоз',WITHDRAW_SENT:'Передать на хаб',WITHDRAW_RECEIVED:'Подтвердить приёмку хабом'};
 const scenarios={case1:['Городская доставка','10 посылок из Центра в Университет одним попутным рейсом.'],case2:['Единичный заказ','Сравнение хаба с отдельным кругом при закрытом попутном окне.'],case3:['Возврат товара','Возврат одной выданной посылки на исходную полку.'],case4:['Частичный сбой','Приёмка девяти посылок, поиск десятой и повтор сообщения.'],case5:['Долгое хранение','30 суток хранения и вывоз непроданного остатка.'],rural:['Сельское плечо','Две посылки из Райцентра в Озёрное при обещании 48 часов.'],sandbox:['Свободная смена','Приёмка и обработка собственных тестовых заказов.']};
-const pages={map:['map','Карта рейсов'],fleet:['truck','Парк машин'],orders:['route','Заказы'],stock:['box','Склад и смена'],ledger:['receipt','Начисления'],portfolio:['chart','Экономика'],demo:['play','Сценарии'],metrics:['activity','Диагностика'],truck:['truck','Текущий рейс']};
+const pages={map:['map','Карта рейсов'],fleet:['truck','Парк машин'],orders:['route','Заказы'],stock:['box','Склад и смена'],demand:['trend','Индекс спроса'],ledger:['receipt','Начисления'],portfolio:['chart','Экономика'],demo:['play','Сценарии'],metrics:['activity','Диагностика'],truck:['truck','Текущий рейс']};
 const allowedPages={dispatcher:Object.keys(pages).filter(p=>p!=='truck'),pvz:['stock','orders','ledger','truck','fleet'],seller:['stock','orders','ledger']};
 let role=localStorage.getItem('atlas-role')||'dispatcher';if(!allowedPages[role])role='dispatcher';
 let activePage=location.hash.slice(1);if(!allowedPages[role].includes(activePage))activePage=allowedPages[role][0];
-let s={},loadSequence=0,consent=0,portfolio=null,busy=false,toastTimer,sortOrders='id';
+let s={},loadSequence=0,consent=0,portfolio=null,demandReport=null,busy=false,toastTimer,sortOrders='id';
 const button=(action,label,symbol='',primary=false,extra='')=>'<button type="button" class="btn '+(primary?'primary':'')+'" data-action="'+esc(action)+'" '+extra+'>'+(symbol?icon(symbol,15):'')+esc(label)+'</button>';
 const chip=(v,c='')=>'<span class="chip '+c+'">'+esc(v)+'</span>';
 const title=(h,sub,actions='')=>'<div class="head"><div><h1>'+esc(h)+'</h1>'+(sub?'<p class="sub">'+esc(sub)+'</p>':'')+'</div><div class="section-actions">'+actions+'</div></div>';
@@ -50,7 +50,7 @@ async function api(path,body){
   if(!r.ok){const d=data.detail||data.message||data.error;const detail=typeof d==='object'?(d.message||d.detail||JSON.stringify(d)):d;throw new Error((r.status===409?'Конфликт версии или остатка. ':'')+(reasons[detail]||detail||r.statusText)+' ('+r.status+')');}
   return data;
 }
-function go(page){if(!allowedPages[role].includes(page))page=allowedPages[role][0];activePage=page;location.hash=page;render();if(page==='portfolio')loadPortfolio().catch(showError);if(page==='fleet'||(page==='demo'&&!fleetSettings))loadFleet().catch(showError)}
+function go(page){if(!allowedPages[role].includes(page))page=allowedPages[role][0];activePage=page;location.hash=page;render();if(page==='portfolio')loadPortfolio().catch(showError);if(page==='demand')loadDemand().catch(showError);if(page==='stock'&&stockTab==='placement'&&role==='dispatcher')loadStockPlacement().catch(showError);if(page==='fleet'||(page==='demo'&&!fleetSettings))loadFleet().catch(showError)}
 function showError(err){
   const msg=err.message||String(err);if(dialog.open){
     $('#dialog-body .notice.error')?.remove();
@@ -70,12 +70,23 @@ async function refresh(){
     }
     s=state;s.orders??=[];s.lots??=[];s.ledger??=[];s.settings??={};s.points??=[];s.totals??={};s.metrics??={};s.steps??=[];
     $('#connection').textContent='Стенд на связи';$('#connection-dot').classList.add('live');
-    render();if(activePage==='portfolio')await loadPortfolio();if(activePage==='fleet'||(activePage==='demo'&&!fleetSettings))await loadFleet();
+    render();if(activePage==='portfolio')await loadPortfolio();if(activePage==='demand')await loadDemand().catch(showError);
+    if(activePage==='stock'&&stockTab==='placement'&&role==='dispatcher')await loadStockPlacement().catch(showError);
+    if(activePage==='fleet'||(activePage==='demo'&&!fleetSettings))await loadFleet();
   }catch(e){if(seq!==loadSequence)return;
     $('#connection').textContent='Нет связи со стендом';$('#connection-dot').classList.remove('live');main.innerHTML=panel('Смена временно недоступна',pad('<div class="stack"><p>'+esc(e.message)+'</p>'+button('refresh','Повторить подключение','refresh')+'</div>'));main.setAttribute('aria-busy','false');}
 }
 async function loadPortfolio(){
   const chosen=consent,selectedDemand=demand,p=await api('portfolio?consent='+chosen+'&demand='+selectedDemand);if(activePage==='portfolio'&&chosen===consent&&selectedDemand===demand){portfolio=p;render();}
+}
+async function loadDemand(){
+  const seq=loadSequence;
+  /** @type {import('./api').DemandReport} */
+  const report=await api('demand');
+  if(seq===loadSequence&&activePage==='demand'&&role==='dispatcher'){
+    demandReport=report;
+    render();
+  }
 }
 async function change(path,data,message){
   await api(path,data);if(dialog.open)dialog.close();portfolio=null;await refresh();if(message)toast(message);
@@ -85,7 +96,7 @@ function render(){
   $('#nav').innerHTML=allowedPages[role].map((p,i)=>((i===4||i===5)?'<div class="nav-sep"></div>':'')+'<button class="nav-item '+(p===activePage?'current':'')+'" data-page="'+p+'" title="'+pages[p][1]+'" aria-label="'+pages[p][1]+'" '+(p===activePage?'aria-current="page"':'')+'>'+icon(pages[p][0],19)+'<span>'+pages[p][1]+'</span></button>').join('');
   $('#crumb').innerHTML='Рабочее место <b> / '+esc(pages[activePage][1])+'</b>';
   $('#clock-control').innerHTML=icon('clock',15)+'<span>'+esc(tm(s.now))+'</span><span class="clock-long">мск</span>';
-  main.innerHTML=({map:mapPage,fleet:fleetPage,orders:ordersPage,stock:stockPage,ledger:ledgerPage,portfolio:portfolioPage,demo:demoPage,metrics:metricsPage,truck:()=>title('Текущий рейс')+executionView(activeTruck)})[activePage]();
+  main.innerHTML=({map:mapPage,fleet:fleetPage,orders:ordersPage,stock:stockPage,demand:demandPage,ledger:ledgerPage,portfolio:portfolioPage,demo:demoPage,metrics:metricsPage,truck:()=>title('Текущий рейс')+executionView(activeTruck)})[activePage]();
   if(activePage==='map'||activePage==='fleet')bindMapControls(document.getElementById('city-map'));
   main.setAttribute('aria-busy','false');
 }

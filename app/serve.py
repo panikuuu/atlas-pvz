@@ -15,8 +15,8 @@ def main():
         if module.read(4) != importlib.util.MAGIC_NUMBER:
             parser.exit(2, "Atlas backend requires CPython 3.15.1. Use Docker Compose or the Windows release.\n")
     import server
-    from fleet_api import FleetHandler
-    server.bootstrap()
+    from fleet_api import FleetHandler, bootstrap
+    bootstrap()
     with ThreadingHTTPServer((args.host, args.port), FleetHandler) as http:
         print(f"Atlas PVZ http://{args.host}:{http.server_port}", flush=True)
         try:

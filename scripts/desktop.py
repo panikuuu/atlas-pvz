@@ -17,7 +17,7 @@ import time
 import winreg
 
 import server
-from fleet_api import FleetHandler
+from fleet_api import FleetHandler, bootstrap
 
 
 USER = ctypes.WinDLL("user32", use_last_error=True)
@@ -174,7 +174,7 @@ def main():
             existing(server.DATA,args.no_browser)
             return
         with listen() as http:
-            server.bootstrap()
+            bootstrap()
             publish(lock,http.server_port)
             if args.no_browser:
                 print(f"http://127.0.0.1:{http.server_port}/",flush=True)

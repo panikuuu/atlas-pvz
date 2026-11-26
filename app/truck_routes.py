@@ -23,6 +23,8 @@ for source, destination, bends in NETWORK["roads"]:
 
 @lru_cache(maxsize=100)
 def distance(source, destination):
+    if source not in STATIONS or destination not in STATIONS:
+        raise ValueError("Unknown road endpoint")
     pending = [(0.0, source)]
     visited = set()
     while pending:
@@ -31,10 +33,17 @@ def distance(source, destination):
             return km
         if point not in visited:
             visited.add(point)
-            for neighbor, length in GRAPH[point]:
+            for neighbor, length in GRAPH.get(point, ()):
                 if neighbor not in visited:
                     heappush(pending, (km + length, neighbor))
     raise ValueError("Disconnected road network")
+
+
+def road_distance(source, destination):
+    try:
+        return distance(source, destination)
+    except ValueError:
+        return None
 
 
 def travel_ms(source, destination):

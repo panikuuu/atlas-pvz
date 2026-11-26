@@ -1,7 +1,7 @@
 """End-to-end checks on a freshly provisioned, private Atlas instance."""
 import argparse
 from collections import Counter
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta
 import json
 import os
@@ -18,20 +18,20 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 
-def request(base, path, body=None, role="dispatcher"):
+def request(base, path, body=None, role="dispatcher", key=None):
     headers = {"X-Role": role}
     payload = None
     if body is not None:
-        headers.update({"Content-Type": "application/json", "Idempotency-Key": str(uuid4())})
+        headers.update({"Content-Type": "application/json", "Idempotency-Key": key or str(uuid4())})
         payload = json.dumps(body).encode()
     with urlopen(Request(base + path, payload, headers), timeout=15) as response:
         return json.load(response)
 
 
 @contextmanager
-def isolated_server(app, exe=None):
-    with TemporaryDirectory(prefix="atlas-ci-") as temp:
-        env = dict(os.environ, PVZ_DATA=temp, PVZ_DEMO="1", PVZ_QUIET="1", PYTHONIOENCODING="utf-8")
+def isolated_server(app, exe=None, *, data_dir=None, demo=True):
+    with (TemporaryDirectory(prefix="atlas-ci-") if data_dir is None else nullcontext(data_dir)) as temp:
+        env = dict(os.environ, PVZ_DATA=str(temp), PVZ_DEMO=str(int(demo)), PVZ_QUIET="1", PYTHONIOENCODING="utf-8")
         command = [sys.executable, str(app / "serve.py"), "--port", "0", "--host", "127.0.0.1"]
         if exe:
             copied = shutil.copy2(exe, Path(temp) / "Atlas-PVZ.exe")

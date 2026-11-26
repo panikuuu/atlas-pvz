@@ -3,16 +3,17 @@
 import json
 
 import desk
+import geography
 import operations
 import routing
 from common import Problem
-from truck_routes import RATES, STATIONS, distance, travel_ms
+from truck_routes import NETWORK, RATES, STATIONS, road_distance
 
 POINTS = {key: point for key, point in STATIONS.items() if key != "HUB"}
 
 
 def is_rural(point):
-    return POINTS[point]["area"] != "Город"
+    return geography.SETTLEMENTS[geography.POINT_SETTLEMENTS[point]][3] != "city"
 
 
 CAPACITY = {key: 120 if is_rural(key) else 240 for key in POINTS}
@@ -38,10 +39,11 @@ def default_settings(source="A", destination="B"):
             "hub_grams", "origin_minutes", "destination_minutes", "destination_open", "origin_open",
             "hub_ready_hours")
     settings.update({key: defaults[key] for key in keys})
+    km = road_distance(source, destination)
     settings.update(
         shared_slots=0, shared_liters=0, shared_grams=0, destination_liters=CAPACITY[destination],
-        roundtrip_fixed=RATES["dedicatedFixed"] + round(2 * distance(source, destination) * RATES["km"]),
-        dedicated_ready_hours=round(2 + travel_ms(source, destination) / 3600000, 2),
+        roundtrip_fixed=RATES["dedicatedFixed"] + round(2 * km * RATES["km"]) if km is not None else None,
+        dedicated_ready_hours=round(2 + km / NETWORK["speedKmh"], 2) if km is not None else None,
         hub_per_unit=RATES["ruralHub" if rural else "cityHub"],
     )
     return settings

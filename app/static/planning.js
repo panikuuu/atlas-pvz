@@ -11,7 +11,7 @@ let cargoOnly=false;
 function shiftTruckOrders(){
   return s.orders.filter(o=>o.status==='ASSEMBLED'&&!o.dispatch_id).map(o=>({
     id:o.id,from:o.source,to:o.destination,liters:o.volume_l,grams:o.mass_g,
-    due:Date.parse(o.selected_promised_at||o.promised_at)
+    due:Date.parse(o.selected_promised_at||o.promised_at),directBlock:o.geography?.direct_block
   }));
 }
 

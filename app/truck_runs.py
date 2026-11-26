@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 import desk
+import geography
 import operations as ops
 import server
 from commands import once, signature
@@ -101,10 +102,16 @@ def confirm(db, body, existing):
         problem("На каждый заказ нужна одна погрузка и одна выгрузка.", 422)
     known = sample_orders(depart) if kind == "sample" else {}
     if kind == "shift":
+        localities = geography.registry(db)
         for oid in picked:
             row = order_state(db, oid)
             if row["status"] != "ASSEMBLED" or row["dispatch_id"]:
                 problem(f"Заказ {oid} уже закреплён или ещё не собран.")
+            blocker = geography.describe(dict(row), localities)["direct_block"]
+            if blocker == "UNKNOWN_GEOGRAPHY":
+                raise Problem(409, blocker, f"Для заказа {oid} недостаточно данных о населённых пунктах.")
+            if blocker == "NO_ROAD_ROUTE":
+                raise Problem(409, blocker, f"Для заказа {oid} нет связного пути по дорожному графу.")
             known[oid] = {"id": oid, "from": row["source"], "to": row["destination"],
                           "liters": row["volume_l"], "grams": row["mass_g"],
                           "due": timestamp(row["promised_at"])}
@@ -127,7 +134,10 @@ def confirm(db, body, existing):
             if orders[oid]["from"] != visit["id"]:
                 problem(f"Проверьте место погрузки {oid}.", 422)
             onboard.add(oid)
-    retime(run)
+    try:
+        retime(run)
+    except ValueError as exc:
+        raise Problem(422, "NO_ROAD_ROUTE", "Между остановками нет пути по дорожному графу.") from exc
     if run["notices"]:
         problem("Рейс не проходит проверку вместимости или срока: " + "; ".join(run["notices"][:3]))
     if kind == "shift":

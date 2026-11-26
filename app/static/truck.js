@@ -13,7 +13,8 @@ function simulateTruck(visits,config){
   for(let i=0;i<visits.length;i++){
     const stop=visits[i];
     if(i){
-      const leg=truckLeg(visits[i-1].id,stop.id);
+      let leg;
+      try{leg=truckLeg(visits[i-1].id,stop.id);}catch{return null;}
       legs.push(leg);
       km+=leg.km;
       time+=leg.minutes*60000;
@@ -106,6 +107,7 @@ function planTruck(orders,config){
     let reason;
     if(!stations[order.from]||!stations[order.to]||order.from===order.to||
       !Number.isFinite(order.due)||!(order.liters>0)||!(order.grams>0))reason='Недостаточно данных';
+    else if(order.directBlock)reason=reasons[order.directBlock]||'Недостаточно данных для прямого рейса';
     else if(order.liters>config.liters||order.grams>config.grams)reason='Не помещается в машину';
     else if(order.due<=config.departure)reason='Срок истекает до выезда';
     if(reason)rejected.push({...order,reason});
@@ -113,6 +115,7 @@ function planTruck(orders,config){
   }
   eligible.sort((a,b)=>a.due-b.due||a.id.localeCompare(b.id));
   let visits=initial,result=simulateTruck(initial,config);
+  if(!result)throw Error('Между начальной и конечной точками нет пути по дорожному графу.');
   for(const order of eligible){
     const added=insertTruckOrder(visits,order,config);
     if(added)({visits,result}=added);

@@ -9,18 +9,64 @@ import sqlite3
 from urllib.parse import urlsplit
 from uuid import uuid4
 
+import demand
 import desk
 import fleet
 import fleet_contracts
+import geography
 import operations as ops
 import pickup_points
 import server
+import stock_placement
 from commands import once, signature
 from common import Problem
 from truck_runs import TruckHandler, current, initialize as init_truck, order_state, problem
 
 MSK = timezone(timedelta(hours=3))
 PREVIOUS_COMMAND = server.apply_command
+PREVIOUS_QUERY = server.query
+PREVIOUS_PROVISION = server.provision
+
+
+def migrate_workspace(name):
+    with closing(server.connect(server.DATA / name)) as db:
+        db.execute("BEGIN IMMEDIATE")
+        geography.migrate(db)
+        demand.migrate(db, server.DEMO_MODE)
+        stock_placement.migrate(db)
+        if db.execute("PRAGMA user_version").fetchone()[0] < 4:
+            db.execute("PRAGMA user_version=4")
+        db.commit()
+
+
+def provision(registry, case, preview=False):
+    name = PREVIOUS_PROVISION(registry, case, preview)
+    migrate_workspace(name)
+    return name
+
+
+def bootstrap():
+    server.bootstrap()
+    with server.GATE, closing(server.connect(server.DATA / "catalog.sqlite")) as db:
+        name = db.execute("SELECT name FROM active").fetchone()["name"]
+        migrate_workspace(name)
+
+
+def query(db, path, args, role):
+    if path == "/api/demand":
+        if role != "dispatcher":
+            raise Problem(403, "ROLE_FORBIDDEN", "Индекс спроса доступен диспетчеру.")
+        return demand.report(db, server.DEMO_MODE)
+    if path == "/api/stock-placement":
+        if role != "dispatcher":
+            raise Problem(403, "ROLE_FORBIDDEN", "Размещение остатка доступно диспетчеру.")
+        return stock_placement.report(db)
+    if path == "/api/stock" and "pvz_id" in args:
+        point = args["pvz_id"]
+        lots = PREVIOUS_QUERY(db, path, {k: v for k, v in args.items() if k != "pvz_id"}, role)
+        return [lot for lot in lots if lot["pvz_id"] == point or
+                any(place.startswith(point + ":") for place in lot["positions"])]
+    return PREVIOUS_QUERY(db, path, args, role)
 
 
 def init(db):
@@ -62,9 +108,10 @@ def live_batches(db, vehicles):
         problem("Для текущей версии расчёт ограничен 60 собранными заказами на смену.",422)
     groups={}
     for o in sorted(eligible,key=lambda o:(o["deadline"],o["id"])):
-        groups.setdefault((o["source"],o["destination"],o["sku_id"]),[]).append(o)
+        block=o["geography"]["direct_block"]
+        groups.setdefault((o["source"],o["destination"],o["sku_id"],block),[]).append(o)
     batches={}
-    for (source,destination,_),orders in groups.items():
+    for (source,destination,_,direct_block),orders in groups.items():
         chunks=[]
         for block in batched(orders,5):
             liters=sum(o["volume_l"] for o in block)
@@ -76,6 +123,7 @@ def live_batches(db, vehicles):
         for group in chunks:
             bid=f"С-{len(batches)+1:02}"
             batches[bid]={"id":bid,"from":source,"to":destination,"qty":len(group),
+                "direct_block":direct_block,
                 "liters":sum(o["volume_l"] for o in group),"kg":sum(o["mass_g"] for o in group)/1000,
                 "ready":ready,"due":min(o["deadline"] for o in group),
                 "orders":[{"id":o["id"],"version":o["version"],"sku":o["sku_id"],"title":o["sku_id"],
@@ -272,6 +320,14 @@ def advance(db,day,body):
 
 
 def protected(db,path,body,role):
+    if path == "/api/stock-placement":
+        return stock_placement.command(db,body)
+    if path == "/api/demand":
+        if body["action"] != "recalculate":
+            if not server.DEMO_MODE:
+                raise Problem(403, "DEMO_DISABLED", "Изменение демоистории отключено.")
+            demand.set_demo_history(db, surge=body["action"] == "surge")
+        return demand.recalculate(db)
     if path=="/api/direction":
         return pickup_points.change_direction(db,body)
     if path in {"/api/events","/api/demo/run","/api/demo/step","/api/truck"}:
@@ -373,4 +429,8 @@ class FleetHandler(TruckHandler):
 
 
 pickup_points.connect_shift()
+geography.connect_shift()
+ops.PACKAGES["SMARTPHONE"] = ([190, 105, 65], 450)
 server.apply_command=protected
+server.query=query
+server.provision=provision

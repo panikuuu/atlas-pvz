@@ -14,7 +14,10 @@ ROUND_TRIP_SPEED_MIN = 60_000
 
 
 def minutes(a, b):
-    return travel_ms(a, b) / ROUND_TRIP_SPEED_MIN
+    try:
+        return travel_ms(a, b) / ROUND_TRIP_SPEED_MIN
+    except ValueError:
+        return float("inf")
 
 
 def cost_parts(km, duration, handling, prices, dedicated=False):
@@ -144,7 +147,10 @@ def drive(route, vehicle, batches, arrivals, prices, calendar=None):
     received={}
     previous=vehicle["start"]
     for point,events in route:
-        t+=minutes(previous,point)
+        travel=minutes(previous,point)
+        if not isfinite(travel):
+            return None
+        t+=travel
         km+=distance(previous,point)
         previous=point
         if not events:
@@ -260,7 +266,7 @@ def solve(vehicles,batches,prices,allow_transfer=True,volume_first=False,bays=No
     def priority(order):
         due,value=order["due"],-estimate_hub(order,prices)
         return (value,due,order["id"]) if volume_first else (due,value,order["id"])
-    orders=sorted(batches.values(),key=priority)
+    orders=sorted((batch for batch in batches.values() if not batch.get("direct_block")),key=priority)
     routes=[[(v["start"],[]),(v["end"],[])] for v in vehicles]
     # Ignore vehicles whose basic path cannot fit even without a pickup.
     pairs=[(v,r) for v,r in zip(vehicles,routes) if v["start_min"]+minutes(v["start"],v["end"])<=v["end_min"]]

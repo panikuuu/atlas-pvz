@@ -5,6 +5,72 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/stock-placement": {
+      "get": {
+        "operationId": "get_stock_placement",
+        "summary": "Рекомендации по свободному стоку и журнал перемещений",
+        "responses": {
+          "200": {"description": "Расчёт и журнал диспетчера",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/StockPlacementReport"}}}},
+          "403": {"description": "Недостаточно прав"}
+        }
+      },
+      "post": {
+        "operationId": "apply_stock_placement",
+        "summary": "Настроить ставки или подтвердить складскую операцию",
+        "parameters": [{"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "anyOf": [
+            {"type": "object", "required": ["action", "settings"], "additionalProperties": false,
+              "properties": {"action": {"enum": ["configure"]}, "settings": {"$ref": "#/components/schemas/StockPlacementSettings"}}},
+            {"type": "object", "required": ["action", "lot_id", "source", "fingerprint"], "additionalProperties": false,
+              "properties": {"action": {"enum": ["confirm"]}, "lot_id": {"type": "string", "minLength": 1},
+                "source": {"$ref": "#/components/schemas/StockPlacementPoint"},
+                "fingerprint": {"type": "string", "minLength": 64, "maxLength": 64}}},
+            {"type": "object", "required": ["action", "transfer_id"], "additionalProperties": false,
+              "properties": {"action": {"enum": ["send", "receive", "cancel"]}, "transfer_id": {"type": "string", "minLength": 1}}}
+          ]
+        }}}},
+        "responses": {
+          "200": {"description": "Сохранённые ставки или перемещение", "content": {"application/json": {"schema": {
+            "type": "object", "properties": {"settings": {"$ref": "#/components/schemas/StockPlacementSettings"},
+              "transfer": {"$ref": "#/components/schemas/StockPlacementTransfer"}}
+          }}}},
+          "403": {"description": "Недостаточно прав"},
+          "409": {"description": "Устаревший расчёт, недоступный сток или конфликт ключа"},
+          "422": {"description": "Недопустимая команда"}
+        }
+      }
+    },
+    "/api/demand": {
+      "get": {
+        "operationId": "get_demand",
+        "summary": "Сохранённый индекс спроса и рекомендации диспетчеру",
+        "responses": {
+          "200": {"description": "Оценки SKU по областям и зонам ПВЗ",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DemandReport"}}}},
+          "403": {"description": "Недостаточно прав"}
+        }
+      },
+      "post": {
+        "operationId": "recalculate_demand",
+        "summary": "Сохранить новые оценки или переключить синтетическую историю",
+        "parameters": [{"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object", "required": ["action"], "additionalProperties": false,
+          "properties": {"action": {"type": "string", "enum": ["recalculate", "baseline", "surge"]}}
+        }}}},
+        "responses": {
+          "200": {"description": "Оценки сохранены", "content": {"application/json": {"schema": {
+            "type": "object", "required": ["recalculated_at"],
+            "properties": {"recalculated_at": {"type": "string", "format": "date-time"}}
+          }}}},
+          "403": {"description": "Недостаточно прав или деморежим отключён"},
+          "409": {"description": "Конфликт ключа операции"},
+          "422": {"description": "Недопустимая команда"}
+        }
+      }
+    },
     "/api/fleet": {
       "get": {
         "operationId": "get_fleet_day",
@@ -1248,7 +1314,150 @@
   },
   "components": {
     "schemas": {
+      "DemandReport": {
+        "type": "object",
+        "required": ["observed_from", "observed_to", "recalculated_at", "forecast_days", "source", "demo_enabled", "rows"],
+        "properties": {
+          "observed_from": {"type": "string", "format": "date-time"},
+          "observed_to": {"type": "string", "format": "date-time"},
+          "recalculated_at": {"type": "string", "format": "date-time"},
+          "forecast_days": {"type": "integer"},
+          "source": {"$ref": "#/components/schemas/PickupPoint"},
+          "demo_enabled": {"type": "boolean"},
+          "rows": {"type": "array", "items": {"$ref": "#/components/schemas/DemandEstimate"}}
+        }
+      },
+      "DemandEstimate": {
+        "type": "object",
+        "required": ["sku", "geography", "region", "region_id", "zone", "zone_name", "locality_id", "locality_name", "locality_type", "observed_from", "observed_to",
+          "unique_orders", "active_weeks", "weighted_orders", "demand_index", "forecast_units", "forecast_days",
+          "confidence", "recalculated_at", "recommendation"],
+        "properties": {
+          "sku": {"type": "string"},
+          "geography": {"enum": ["region", "zone"]},
+          "region": {"type": "string"},
+          "region_id": {"type": "string"},
+          "zone": {"type": "string", "description": "Код ПВЗ или пустая строка для области"},
+          "zone_name": {"type": ["string", "null"]},
+          "locality_id": {"type": ["string", "null"]},
+          "locality_name": {"type": ["string", "null"]},
+          "locality_type": {"type": ["string", "null"]},
+          "observed_from": {"type": "string", "format": "date-time"},
+          "observed_to": {"type": "string", "format": "date-time"},
+          "unique_orders": {"type": "integer", "minimum": 0},
+          "active_weeks": {"type": "integer", "minimum": 0, "maximum": 4},
+          "weighted_orders": {"type": "number", "minimum": 0},
+          "demand_index": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+          "forecast_units": {"type": ["number", "null"], "minimum": 0},
+          "forecast_days": {"type": "integer"},
+          "confidence": {"enum": ["low", "medium", "high"]},
+          "recalculated_at": {"type": "string", "format": "date-time"},
+          "recommendation": {
+            "type": "object",
+            "required": ["units", "reason", "on_hand", "free_liters", "shelf_units", "transport_units"],
+            "properties": {
+              "units": {"type": ["integer", "null"]},
+              "reason": {"type": "string"},
+              "on_hand": {"type": "integer"},
+              "free_liters": {"type": ["number", "null"]},
+              "shelf_units": {"type": ["integer", "null"]},
+              "transport_units": {"type": ["integer", "null"]}
+            }
+          }
+        }
+      },
       "PickupPoint": {"type":"string","enum":["A","B","C","D","E","F","G","J","K"]},
+      "StockPlacementPoint": {"anyOf": [{"$ref": "#/components/schemas/PickupPoint"}, {"enum": ["HUB"]}]},
+      "StockPlacementSettings": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}},
+      "StockPlacementReport": {
+        "type": "object", "required": ["settings", "rows", "transfers"],
+        "properties": {
+          "settings": {"$ref": "#/components/schemas/StockPlacementSettings"},
+          "rows": {"type": "array", "items": {"$ref": "#/components/schemas/StockPlacementRow"}},
+          "transfers": {"type": "array", "items": {"$ref": "#/components/schemas/StockPlacementTransfer"}}
+        }
+      },
+      "StockPlacementRow": {
+        "type": "object", "required": ["lot_id", "sku", "source", "available", "version", "recommendation", "options", "fingerprint"],
+        "properties": {
+          "lot_id": {"type": "string"}, "sku": {"type": "string"},
+          "source": {"$ref": "#/components/schemas/StockPlacementPoint"},
+          "available": {"type": "integer", "minimum": 1}, "version": {"type": "integer"},
+          "fingerprint": {"type": "string"},
+          "recommendation": {"type": "object", "required": ["action", "point", "reason", "improvement"], "properties": {
+            "action": {"enum": ["keep", "hub", "relocate"]}, "point": {"$ref": "#/components/schemas/StockPlacementPoint"},
+            "reason": {"type": "string"}, "improvement": {"type": "integer", "description": "Копейки относительно хранения на месте"}
+          }},
+          "options": {"type": "array", "items": {"$ref": "#/components/schemas/StockPlacementOption"}}
+        }
+      },
+      "StockPlacementOption": {
+        "type": "object",
+        "properties": {
+          "action": {"enum": ["keep", "hub", "relocate"]}, "point": {"$ref": "#/components/schemas/StockPlacementPoint"},
+          "eligible": {"type": "boolean"}, "reason": {"type": "string"},
+          "demand_index": {"type": ["integer", "null"]}, "forecast_units": {"type": ["number", "null"]},
+          "forecast_days": {"type": "integer"}, "confidence": {"enum": ["low", "medium", "high"]},
+          "expected_sales": {"type": "number", "minimum": 0, "maximum": 1},
+          "benefit": {"type": "integer", "description": "Ожидаемая маржа в копейках"},
+          "costs": {"type": "object", "description": "Хранение, место, капитал, неликвид и перевозка в копейках",
+            "required": ["storage", "space", "capital", "obsolescence", "transport"],
+            "additionalProperties": {"type": "integer", "minimum": 0}},
+          "net": {"type": ["integer", "null"], "description": "Чистый результат в копейках"},
+          "mode": {"type": ["string", "null"]}, "available_and_incoming": {"type": "integer", "minimum": 0}
+        }
+      },
+      "StockPlacementTransfer": {
+        "type": "object", "required": ["id", "lot_id", "sku", "source", "destination", "status", "economics", "journal"],
+        "properties": {
+          "id": {"type": "string"}, "lot_id": {"type": "string"}, "sku": {"type": "string"},
+          "source": {"$ref": "#/components/schemas/StockPlacementPoint"}, "destination": {"$ref": "#/components/schemas/StockPlacementPoint"},
+          "status": {"enum": ["RESERVED", "IN_TRANSIT", "RECEIVED", "CANCELLED"]},
+          "economics": {"$ref": "#/components/schemas/StockPlacementOption"},
+          "journal": {"type": "array", "items": {"type": "object", "required": ["at", "event_id", "action"],
+            "properties": {"at": {"type": "string", "format": "date-time"}, "event_id": {"type": "string"},
+              "action": {"enum": ["PLACEMENT_RESERVED", "PLACEMENT_SENT", "PLACEMENT_RECEIVED", "PLACEMENT_CANCELLED"]}}}}
+        }
+      },
+      "NullablePickupPoint": {
+        "anyOf": [{"$ref": "#/components/schemas/PickupPoint"}, {"type": "null"}]
+      },
+      "Locality": {
+        "type": "object",
+        "required": ["id", "name", "region_id", "region_name", "type"],
+        "properties": {
+          "id": {"type": "string", "description": "Стабильный идентификатор населённого пункта"},
+          "name": {"type": "string"},
+          "region_id": {"type": "string"},
+          "region_name": {"type": "string"},
+          "type": {"type": "string", "enum": ["city", "town", "village", "hamlet"]}
+        }
+      },
+      "OrderLocation": {
+        "type": "object",
+        "required": ["point_id", "locality"],
+        "properties": {
+          "point_id": {"type": ["string", "null"]},
+          "locality": {"anyOf": [{"$ref": "#/components/schemas/Locality"}, {"type": "null"}]}
+        }
+      },
+      "OrderGeography": {
+        "type": "object",
+        "required": ["relation", "route_scope", "reason", "seller_ship_from", "buyer_pickup", "stock_start",
+          "road_km", "direct_block"],
+        "properties": {
+          "relation": {"type": "string", "enum": ["same_locality", "different_localities", "unknown"],
+            "description": "Сравнение населённых пунктов отгрузки продавца и выдачи покупателю"},
+          "route_scope": {"type": "string", "enum": ["local", "intercity", "rural", "unknown"],
+            "description": "Вид перевозки от фактического места хранения до ПВЗ выдачи"},
+          "reason": {"type": "string"},
+          "seller_ship_from": {"$ref": "#/components/schemas/OrderLocation"},
+          "buyer_pickup": {"$ref": "#/components/schemas/OrderLocation"},
+          "stock_start": {"$ref": "#/components/schemas/OrderLocation"},
+          "road_km": {"type": ["number", "null"], "minimum": 0},
+          "direct_block": {"type": ["string", "null"], "enum": ["UNKNOWN_GEOGRAPHY", "NO_ROAD_ROUTE", null]}
+        }
+      },
       "Error": {
         "type": "object",
         "properties": {
@@ -1347,6 +1556,11 @@
             "minLength": 1
           },
           "pvz_id": {"$ref": "#/components/schemas/PickupPoint"},
+          "seller_ship_from_pvz_id": {
+            "$ref": "#/components/schemas/NullablePickupPoint",
+            "description": "Точка отгрузки продавца. По умолчанию ПВЗ первоначальной приёмки партии. Null обозначает неизвестную точку."
+          },
+          "stock_source_pvz_id": {"$ref": "#/components/schemas/PickupPoint", "description": "ПВЗ с доступной физической единицей партии"},
           "quantity": {
             "enum": [
               1
@@ -1623,8 +1837,10 @@
             "type": "string",
             "minLength": 1
           },
-          "source": {"$ref": "#/components/schemas/PickupPoint"},
+          "source": {"$ref": "#/components/schemas/PickupPoint", "description": "Фактический ПВЗ старта груза"},
           "destination": {"$ref": "#/components/schemas/PickupPoint"},
+          "seller_ship_from_pvz_id": {"$ref": "#/components/schemas/NullablePickupPoint"},
+          "geography": {"$ref": "#/components/schemas/OrderGeography"},
           "version": {
             "type": "integer",
             "minimum": 1
@@ -1659,6 +1875,8 @@
           "available": {
             "type": "integer"
           },
+          "available_by_pvz": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}},
+          "reserved_by_pvz": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}},
           "pvz_id": {"$ref": "#/components/schemas/PickupPoint"},
           "version": {
             "type": "integer",
@@ -1994,6 +2212,10 @@
           "lot_id": {
             "type": "string"
           },
+          "source": {"$ref": "#/components/schemas/PickupPoint"},
+          "destination": {"$ref": "#/components/schemas/PickupPoint"},
+          "seller_ship_from_pvz_id": {"$ref": "#/components/schemas/NullablePickupPoint"},
+          "geography": {"$ref": "#/components/schemas/OrderGeography"},
           "promised_at": {
             "type": "string"
           }
